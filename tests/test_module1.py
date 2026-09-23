@@ -5,7 +5,14 @@ import os
 import json
 import tempfile
 from pathlib import Path
-from base64 import b64decode
+from contextlib import contextmanager
+from datetime import datetime, timedelta, timezone
+from base64 import b64decode, b64encode
+
+from cryptography import x509
+from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives.asymmetric import padding, rsa
+from cryptography.x509.oid import NameOID
 
 from module1_board_prep.crypto_utils import (
     generate_rsa_keypair,
@@ -24,6 +31,49 @@ from module1_board_prep.watermark import (
 )
 from module1_board_prep.board_prep import prepare_exam_package, save_package
 from cryptography.exceptions import InvalidTag
+
+
+def _write_center_cert(center_id: str, out_dir: Path) -> tuple[rsa.RSAPrivateKey, x509.Certificate]:
+    """Write a self-signed cert and private key for a test center."""
+    key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    subject = issuer = x509.Name([
+        x509.NameAttribute(NameOID.COMMON_NAME, center_id),
+    ])
+    cert = (
+        x509.CertificateBuilder()
+        .subject_name(subject)
+        .issuer_name(issuer)
+        .public_key(key.public_key())
+        .serial_number(x509.random_serial_number())
+        .not_valid_before(datetime.now(timezone.utc) - timedelta(days=1))
+        .not_valid_after(datetime.now(timezone.utc) + timedelta(days=365))
+        .add_extension(x509.SubjectAlternativeName([x509.DNSName(center_id)]), critical=False)
+        .sign(key, hashes.SHA256())
+    )
+    out_dir.mkdir(parents=True, exist_ok=True)
+    (out_dir / f"{center_id}.key.pem").write_bytes(
+        key.private_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PrivateFormat.TraditionalOpenSSL,
+            encryption_algorithm=serialization.NoEncryption(),
+        )
+    )
+    (out_dir / f"{center_id}.cert.pem").write_bytes(cert.public_bytes(serialization.Encoding.PEM))
+    return key, cert
+
+
+@contextmanager
+def _cert_context_for_centers(tmpdir: str, center_ids: list[str]):
+    """Create temporary center certs and chdir to the temp workspace for tests."""
+    cert_dir = Path(tmpdir) / "certs"
+    for center_id in center_ids:
+        _write_center_cert(center_id, cert_dir)
+    orig_cwd = os.getcwd()
+    os.chdir(tmpdir)
+    try:
+        yield
+    finally:
+        os.chdir(orig_cwd)
 
 
 # ============================================================================
@@ -523,7 +573,8 @@ def test_prepare_exam_package_basic():
         center_ids = ["CENTER_A", "CENTER_B"]
         master_secret = os.urandom(32)
 
-        package = prepare_exam_package(paper_path, center_ids, master_secret)
+        with _cert_context_for_centers(tmpdir, center_ids):
+            package = prepare_exam_package(paper_path, center_ids, master_secret)
 
         assert isinstance(package, dict)
         assert "version" in package
@@ -558,7 +609,8 @@ def test_prepare_exam_package_each_center_unique_watermark():
         center_ids = ["CENTER_A", "CENTER_B", "CENTER_C"]
         master_secret = os.urandom(32)
 
-        package = prepare_exam_package(paper_path, center_ids, master_secret)
+        with _cert_context_for_centers(tmpdir, center_ids):
+            package = prepare_exam_package(paper_path, center_ids, master_secret)
 
         # Extract watermarks
         watermarks = {}
@@ -573,6 +625,72 @@ def test_prepare_exam_package_each_center_unique_watermark():
         assert len(unique_watermarks) == len(center_ids)
 
 
+def test_prepare_exam_package_each_center_has_unique_wrapped_key():
+    """Each center should receive its own RSA-wrapped AES key."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        paper_path = os.path.join(tmpdir, "exam.pdf")
+        with open(paper_path, "wb") as f:
+            f.write(b"Exam paper")
+
+        center_ids = ["CENTER_A", "CENTER_B"]
+        master_secret = os.urandom(32)
+
+        with _cert_context_for_centers(tmpdir, center_ids):
+            center_keys = {
+                cid: serialization.load_pem_private_key(
+                    (Path(tmpdir) / "certs" / f"{cid}.key.pem").read_bytes(),
+                    password=None,
+                )
+                for cid in center_ids
+            }
+            package = prepare_exam_package(paper_path, center_ids, master_secret)
+
+        wrapped_a = b64decode(package["centers"]["CENTER_A"]["wrapped_key"])
+        wrapped_b = b64decode(package["centers"]["CENTER_B"]["wrapped_key"])
+        assert wrapped_a != wrapped_b
+
+        for center_id, private_key in center_keys.items():
+            wrapped = b64decode(package["centers"][center_id]["wrapped_key"])
+            aes_key = private_key.decrypt(
+                wrapped,
+                padding.OAEP(
+                    mgf=padding.MGF1(algorithm=hashes.SHA256()),
+                    algorithm=hashes.SHA256(),
+                    label=None,
+                ),
+            )
+            assert len(aes_key) == 32
+
+
+def test_prepare_exam_package_wrong_center_private_key_fails():
+    """CENTER_A private key must not unwrap CENTER_B's wrapped AES key."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        paper_path = os.path.join(tmpdir, "exam.pdf")
+        with open(paper_path, "wb") as f:
+            f.write(b"Exam paper")
+
+        center_ids = ["CENTER_A", "CENTER_B"]
+        master_secret = os.urandom(32)
+
+        with _cert_context_for_centers(tmpdir, center_ids):
+            center_a_priv = serialization.load_pem_private_key(
+                (Path(tmpdir) / "certs" / "CENTER_A.key.pem").read_bytes(),
+                password=None,
+            )
+            package = prepare_exam_package(paper_path, center_ids, master_secret)
+
+        wrapped_b = b64decode(package["centers"]["CENTER_B"]["wrapped_key"])
+        with pytest.raises(ValueError):
+            center_a_priv.decrypt(
+                wrapped_b,
+                padding.OAEP(
+                    mgf=padding.MGF1(algorithm=hashes.SHA256()),
+                    algorithm=hashes.SHA256(),
+                    label=None,
+                ),
+            )
+
+
 def test_prepare_exam_package_shared_ciphertext():
     """All centers should share the same ciphertext/nonce/tag."""
     with tempfile.TemporaryDirectory() as tmpdir:
@@ -583,7 +701,8 @@ def test_prepare_exam_package_shared_ciphertext():
         center_ids = ["CENTER_A", "CENTER_B", "CENTER_C"]
         master_secret = os.urandom(32)
 
-        package = prepare_exam_package(paper_path, center_ids, master_secret)
+        with _cert_context_for_centers(tmpdir, center_ids):
+            package = prepare_exam_package(paper_path, center_ids, master_secret)
 
         # Check that ciphertext/nonce/tag are same across centers
         ciphertext = package["centers"]["CENTER_A"]["ciphertext"]
@@ -606,7 +725,8 @@ def test_prepare_exam_package_no_plaintext_key():
         center_ids = ["CENTER_A"]
         master_secret = os.urandom(32)
 
-        package = prepare_exam_package(paper_path, center_ids, master_secret)
+        with _cert_context_for_centers(tmpdir, center_ids):
+            package = prepare_exam_package(paper_path, center_ids, master_secret)
 
         # Convert to JSON string and check it's not there
         package_str = json.dumps(package)
@@ -620,6 +740,83 @@ def test_prepare_exam_package_no_plaintext_key():
         # Should be decodable as base64
         wrapped_key_bytes = b64decode(wrapped_key_b64)
         assert len(wrapped_key_bytes) > 32  # RSA-OAEP wrapped key is larger
+
+
+def test_prepare_exam_package_wrapped_key_hash_tampering_breaks_signature():
+    """A tampered wrapped_key_hashes map should invalidate the board signature."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        paper_path = os.path.join(tmpdir, "exam.pdf")
+        with open(paper_path, "wb") as f:
+            f.write(b"Exam paper")
+
+        center_ids = ["CENTER_A", "CENTER_B"]
+        master_secret = os.urandom(32)
+
+        with _cert_context_for_centers(tmpdir, center_ids):
+            package = prepare_exam_package(paper_path, center_ids, master_secret)
+
+        board_public_key = serialization.load_pem_public_key(package["board_public_key_pem"].encode("utf-8"))
+        signature = b64decode(package["signature"])
+        canonical_data = package["canonical_data"]
+        canonical_json = json.dumps(canonical_data, sort_keys=True, separators=(",", ":"))
+        assert rsa_verify(canonical_json.encode("utf-8"), signature, board_public_key) is True
+
+        tampered = json.loads(json.dumps(canonical_data))
+        tampered["wrapped_key_hashes"]["CENTER_A"] = b64encode(os.urandom(32)).decode("utf-8")
+        tampered_json = json.dumps(tampered, sort_keys=True, separators=(",", ":"))
+
+        assert rsa_verify(tampered_json.encode("utf-8"), signature, board_public_key) is False
+
+
+def test_prepare_exam_package_missing_certificate():
+    """A missing center certificate should raise FileNotFoundError and identify the center."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        paper_path = os.path.join(tmpdir, "exam.pdf")
+        with open(paper_path, "wb") as f:
+            f.write(b"Exam paper")
+
+        with pytest.raises(FileNotFoundError, match="MISSING_CENTER"):
+            with _cert_context_for_centers(tmpdir, ["CENTER_A"]):
+                prepare_exam_package(paper_path, ["MISSING_CENTER"], os.urandom(32))
+
+
+def test_prepare_exam_package_malformed_certificate():
+    """Malformed certificate bytes should be rejected cleanly as a ValueError."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        paper_path = os.path.join(tmpdir, "exam.pdf")
+        with open(paper_path, "wb") as f:
+            f.write(b"Exam paper")
+
+        cert_dir = Path(tmpdir) / "certs"
+        cert_dir.mkdir(parents=True, exist_ok=True)
+        (cert_dir / "CENTER_BAD.cert.pem").write_bytes(b"not-a-real-certificate")
+
+        orig_cwd = os.getcwd()
+        os.chdir(tmpdir)
+        try:
+            with pytest.raises(ValueError, match="Invalid certificate|CENTER_BAD"):
+                prepare_exam_package(paper_path, ["CENTER_BAD"], os.urandom(32))
+        finally:
+            os.chdir(orig_cwd)
+
+
+def test_prepare_exam_package_invalid_center_id_path_traversal():
+    """A path traversal center ID should not be accepted as a valid cert path."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        paper_path = os.path.join(tmpdir, "exam.pdf")
+        with open(paper_path, "wb") as f:
+            f.write(b"Exam paper")
+
+        cert_dir = Path(tmpdir) / "certs"
+        cert_dir.mkdir(parents=True, exist_ok=True)
+
+        orig_cwd = os.getcwd()
+        os.chdir(tmpdir)
+        try:
+            with pytest.raises(ValueError, match="Invalid center_id"):
+                prepare_exam_package(paper_path, ["../ESCAPE"], os.urandom(32))
+        finally:
+            os.chdir(orig_cwd)
 
 
 def test_prepare_exam_package_empty_center_ids():
@@ -665,7 +862,8 @@ def test_save_package_creates_files():
         center_ids = ["CENTER_A", "CENTER_B"]
         master_secret = os.urandom(32)
 
-        package = prepare_exam_package(paper_path, center_ids, master_secret)
+        with _cert_context_for_centers(tmpdir, center_ids):
+            package = prepare_exam_package(paper_path, center_ids, master_secret)
 
         # Save to temp output directory
         output_dir = os.path.join(tmpdir, "output")
@@ -694,7 +892,8 @@ def test_save_package_files_loadable():
         center_ids = ["CENTER_A", "CENTER_B"]
         master_secret = os.urandom(32)
 
-        package = prepare_exam_package(paper_path, center_ids, master_secret)
+        with _cert_context_for_centers(tmpdir, center_ids):
+            package = prepare_exam_package(paper_path, center_ids, master_secret)
 
         output_dir = os.path.join(tmpdir, "output")
         save_package(package, output_dir)
@@ -723,7 +922,8 @@ def test_save_package_signature_verifiable():
         center_ids = ["CENTER_MAIN"]
         master_secret = os.urandom(32)
 
-        package = prepare_exam_package(paper_path, center_ids, master_secret)
+        with _cert_context_for_centers(tmpdir, center_ids):
+            package = prepare_exam_package(paper_path, center_ids, master_secret)
 
         output_dir = os.path.join(tmpdir, "output")
         save_package(package, output_dir)
@@ -753,7 +953,8 @@ def test_save_package_path_traversal_protection():
         center_ids = ["CENTER/../ESCAPE"]
         master_secret = os.urandom(32)
 
-        package = prepare_exam_package(paper_path, center_ids, master_secret)
+        with _cert_context_for_centers(tmpdir, center_ids):
+            package = prepare_exam_package(paper_path, center_ids, master_secret)
 
         output_dir = os.path.join(tmpdir, "output")
         save_package(package, output_dir)
@@ -785,7 +986,8 @@ def test_full_flow_prepare_and_trace():
         center_ids = ["CENTER_A", "CENTER_B", "CENTER_C"]
         master_secret = os.urandom(32)
 
-        package = prepare_exam_package(paper_path, center_ids, master_secret)
+        with _cert_context_for_centers(tmpdir, center_ids):
+            package = prepare_exam_package(paper_path, center_ids, master_secret)
 
         # Simulate a leak: someone leaked CENTER_B's package
         leaked_ciphertext_b64 = package["centers"]["CENTER_B"]["ciphertext"]
@@ -818,7 +1020,8 @@ def test_full_flow_signature_verification():
         center_ids = ["CENTER_VERIFY"]
         master_secret = os.urandom(32)
 
-        package = prepare_exam_package(paper_path, center_ids, master_secret)
+        with _cert_context_for_centers(tmpdir, center_ids):
+            package = prepare_exam_package(paper_path, center_ids, master_secret)
 
         # Extract signature and canonical data
         signature_b64 = package["signature"]
