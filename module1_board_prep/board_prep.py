@@ -12,6 +12,12 @@ import os
 from base64 import b64encode, b64decode
 from pathlib import Path
 
+from cryptography import x509
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric.rsa import RSAPublicKey
+from cryptography.exceptions import UnsupportedAlgorithm
+
+from common.constants import CERTS_DIR
 from module1_board_prep.crypto_utils import (
     generate_rsa_keypair,
     aes_encrypt,
@@ -20,7 +26,32 @@ from module1_board_prep.crypto_utils import (
     _rsa_wrap_key,
 )
 from module1_board_prep.watermark import generate_center_secret, embed_watermark
-from cryptography.hazmat.primitives import serialization
+
+
+def _load_center_public_key(center_id: str) -> RSAPublicKey:
+    """Load and validate the RSA public key embedded in a center certificate."""
+    if not center_id or not center_id.strip():
+        raise ValueError("center_id cannot be empty")
+
+    cert_dir = Path(CERTS_DIR).resolve(strict=False)
+    candidate = (cert_dir / f"{center_id}.cert.pem").resolve(strict=False)
+    if candidate != cert_dir / f"{center_id}.cert.pem" and cert_dir not in candidate.parents:
+        raise ValueError(f"Invalid center_id: {center_id}")
+
+    if not candidate.exists():
+        raise FileNotFoundError(f"Certificate not found for center '{center_id}' at '{candidate}'")
+
+    try:
+        with open(candidate, "rb") as f:
+            cert = x509.load_pem_x509_certificate(f.read())
+    except (ValueError, TypeError, UnsupportedAlgorithm) as exc:
+        raise ValueError(f"Invalid certificate for center '{center_id}'") from exc
+
+    public_key = cert.public_key()
+    if not isinstance(public_key, RSAPublicKey):
+        raise ValueError(f"Certificate for center '{center_id}' does not contain an RSA public key")
+
+    return public_key
 
 
 def prepare_exam_package(paper_path: str, center_ids: list[str], master_secret: bytes) -> dict:
@@ -65,19 +96,19 @@ def prepare_exam_package(paper_path: str, center_ids: list[str], master_secret: 
     # Step 3: Encrypt the paper
     ciphertext, nonce, tag = aes_encrypt(paper_bytes, aes_key)
 
-    # Step 4: Wrap AES key with board's public key
-    wrapped_aes_key = _rsa_wrap_key(aes_key, board_public_key)
-
-    # Step 5: For each center, derive secret and embed watermark
+    # Step 4: For each center, load the center's certificate and wrap the AES key
+    # using the center's RSA public key. This allows Module 2 to unwrap using the
+    # center's private key while preserving a board signature over the package.
     centers_data = {}
+    wrapped_key_hashes = {}
     for center_id in center_ids:
-        # Derive center secret
-        center_secret = generate_center_secret(center_id, master_secret)
+        center_public_key = _load_center_public_key(center_id)
+        wrapped_aes_key = _rsa_wrap_key(aes_key, center_public_key)
 
-        # Embed watermark into the ciphertext representation
+        # Derive center secret and watermark the shared ciphertext for this center.
+        center_secret = generate_center_secret(center_id, master_secret)
         watermarked_paper = embed_watermark(ciphertext, center_id, center_secret)
 
-        # Store center-specific data
         centers_data[center_id] = {
             "watermarked_paper": b64encode(watermarked_paper).decode("utf-8"),
             "ciphertext": b64encode(ciphertext).decode("utf-8"),
@@ -85,10 +116,10 @@ def prepare_exam_package(paper_path: str, center_ids: list[str], master_secret: 
             "tag": b64encode(tag).decode("utf-8"),
             "wrapped_key": b64encode(wrapped_aes_key).decode("utf-8"),
         }
+        wrapped_key_hashes[center_id] = b64encode(sha256_hash(wrapped_aes_key)).decode("utf-8")
 
-    # Step 6: Create a deterministic canonical representation for signing
-    # We sign the common encryption data + all center IDs (but not per-center watermarks)
-    # This ensures package integrity while allowing per-center verification
+    # Step 5: Create a deterministic canonical representation for signing.
+    # Include the wrapped-key hashes per center so any tampering invalidates the board signature.
     canonical_data = {
         "version": "1.0",
         "algorithm": {
@@ -100,7 +131,7 @@ def prepare_exam_package(paper_path: str, center_ids: list[str], master_secret: 
         "ciphertext_hash": b64encode(sha256_hash(ciphertext)).decode("utf-8"),
         "nonce": b64encode(nonce).decode("utf-8"),
         "tag": b64encode(tag).decode("utf-8"),
-        "wrapped_key_hash": b64encode(sha256_hash(wrapped_aes_key)).decode("utf-8"),
+        "wrapped_key_hashes": wrapped_key_hashes,
         "center_ids": sorted(center_ids),
     }
 
