@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>ExamShield | Verification</title>
+    <link rel="stylesheet"
+          href="{{ url_for('static', filename='style.css') }}">
+</head>
+
+<body>
+
+<div class="app-layout">
+
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+
+        <div class="brand">
+            <div class="brand-icon">🛡</div>
+
+            <div>
+                <div class="brand-name">ExamShield</div>
+                <div class="brand-subtitle">SECURE EXAM SYSTEM</div>
+            </div>
+        </div>
+
+        <div class="sidebar-section">
+
+            <div class="sidebar-label">COMMAND CENTER</div>
+
+            <a class="nav-item" href="/">
+                <span>⌂</span> Dashboard
+            </a>
+
+            <a class="nav-item" href="/papers">
+                <span>▣</span> Exam Papers
+            </a>
+
+            <a class="nav-item" href="/centers">
+                <span>◉</span> Center Authorization
+            </a>
+
+            <a class="nav-item" href="/key-release">
+                <span>🔑</span> Key Release
+            </a>
+
+            <a class="nav-item" href="/sessions">
+                <span>◫</span> Exam Sessions
+            </a>
+
+            <a class="nav-item" href="/integrity">
+                <span>◇</span> Integrity & Audit
+            </a>
+
+            <a class="nav-item active" href="/verification">
+                <span>✓</span> Verification
+            </a>
+
+            <a class="nav-item" href="/reports">
+                <span>▤</span> Reports
+            </a>
+
+        </div>
+
+        <div class="sidebar-bottom">
+            <div class="system-status">
+                <span class="status-dot"></span>
+                SYSTEM SECURE
+            </div>
+        </div>
+
+    </aside>
+
+
+    <!-- MAIN CONTENT -->
+    <main class="main-content">
+
+        <header class="topbar">
+
+            <div>
+                <p class="eyebrow">MODULE 6</p>
+
+                <h2>Post-Exam Verification</h2>
+
+                <p class="subtitle">
+                    Verify the examination paper, submitted answers and audit history.
+                </p>
+            </div>
+
+        </header>
+
+
+        <section class="panel">
+
+            <div class="panel-header">
+
+                <div>
+                    <span class="panel-label">VERIFICATION RESULTS</span>
+                    <h3>{{ verification_result.center_id if verification_result else center_id }}</h3>
+                </div>
+
+                <span class="badge {{ 'green' if verification_result and verification_result.overall else 'red' }}">
+    {% if verification_result %}
+        {{ 'PASS' if verification_result.overall else 'FAIL' }}
+    {% else %}
+        WAITING
+    {% endif %}
+</span>
+
+            </div>
+
+
+            <div class="verification-list">
+    <div>
+        <span>Paper Signature</span>
+        <b>
+            {% if verification_result %}
+                {{ '✓ VERIFIED' if verification_result.signature_valid else '✗ TAMPERED' }}
+            {% else %}
+                WAITING
+            {% endif %}
+        </b>
+    </div>
+
+    <div>
+        <span>Merkle Root</span>
+        <b>
+            {% if verification_result %}
+                {{ '✓ VERIFIED' if verification_result.merkle_valid else '✗ TAMPERED' }}
+            {% else %}
+                WAITING
+            {% endif %}
+        </b>
+    </div>
+
+    <div>
+        <span>Audit Chain</span>
+        <b>
+            {% if verification_result %}
+                {{ '✓ VERIFIED' if verification_result.audit_valid else '✗ TAMPERED' }}
+            {% else %}
+                WAITING
+            {% endif %}
+        </b>
+    </div>
+
+    <div>
+        <span>Overall Integrity</span>
+        <b>
+            {% if verification_result %}
+                {{ '✓ PASS' if verification_result.overall else '✗ TAMPERING DETECTED' }}
+            {% else %}
+                WAITING
+            {% endif %}
+        </b>
+    </div>
+</div>
+
+{% if integrity_details %}
+<section class="panel" style="margin-top: 24px;">
+    <div class="panel-header">
+        <div>
+            <span class="panel-label">TAMPER DETECTION DETAILS</span>
+            <h3>Integrity Analysis</h3>
+        </div>
+    </div>
+
+    <div class="verification-list">
+
+        <div>
+            <span>Question Paper</span>
+            <b>
+                {{ integrity_details.paper.status }}
+            </b>
+        </div>
+
+        <p class="subtitle">
+            {{ integrity_details.paper.message }}
+        </p>
+
+        <div>
+            <span>Submitted Answers</span>
+            <b>
+                {{ integrity_details.answers.status }}
+            </b>
+        </div>
+
+        <p class="subtitle">
+            {{ integrity_details.answers.message }}
+        </p>
+
+        <div>
+            <span>Audit Log</span>
+            <b>
+                {{ integrity_details.audit.status }}
+            </b>
+        </div>
+
+        <p class="subtitle">
+            {{ integrity_details.audit.message }}
+        </p>
+
+        <div>
+            <span>Overall Status</span>
+            <b>
+                {{ integrity_details.overall.status }}
+            </b>
+        </div>
+
+    </div>
+</section>
+{% endif %}
+
+
+            <br>
+
+
+            <form method="POST" action="{{ url_for('run_verification') }}">
+                <button class="primary-btn" type="submit">
+                    🔍 Run Full Verification
+                </button>
+            </form>
+            <form method="POST"
+                action="{{ url_for('tamper_answer_demo') }}"
+                style="margin-top: 12px;">
+                <button class="primary-btn" type="submit">
+                    ⚠️ Simulate Answer Tampering
+                </button>
+            </form>
+
+        </section>
+
+    </main>
+
+</div>
+
+</body>
+</html>

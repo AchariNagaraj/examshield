@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ExamShield - Exam Papers</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+
+<body>
+
+<div class="app-layout">
+
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+
+        <div class="brand">
+            <div class="brand-icon">🛡</div>
+            <div>
+                <div class="brand-name">ExamShield</div>
+                <div class="brand-subtitle">SECURE EXAM SYSTEM</div>
+            </div>
+        </div>
+
+        <div class="sidebar-section">
+            <div class="sidebar-label">COMMAND CENTER</div>
+
+            <a class="nav-item" href="/">
+                <span>⌂</span> Dashboard
+            </a>
+
+            <a class="nav-item active" href="/papers">
+                <span>▣</span> Exam Papers
+            </a>
+
+            <a class="nav-item" href="/centers">
+                <span>◉</span> Center Authorization
+            </a>
+
+            <a class="nav-item" href="/key-release">
+                <span>🔑</span> Key Release
+            </a>
+
+            <a class="nav-item" href="/sessions">
+                <span>◫</span> Exam Sessions
+            </a>
+
+            <a class="nav-item" href="/integrity">
+                <span>◇</span> Integrity & Audit
+            </a>
+
+            <a class="nav-item" href="/verification">
+                <span>✓</span> Verification
+            </a>
+
+            <a class="nav-item" href="/reports">
+                <span>▤</span> Reports
+            </a>
+        </div>
+
+        <div class="sidebar-bottom">
+            <div class="system-status">
+                <span class="status-dot"></span>
+                SYSTEM SECURE
+            </div>
+        </div>
+
+    </aside>
+
+
+    <!-- MAIN CONTENT -->
+    <main class="main-content">
+
+        <div class="topbar">
+            <div>
+                <div class="page-eyebrow">MODULE 01 / PAPER SECURITY</div>
+                <h1>Exam Papers</h1>
+                <p class="page-description">
+                    Prepare, encrypt and securely package examination papers
+                    before distribution.
+                </p>
+            </div>
+        </div>
+
+
+        <!-- FLASH MESSAGES -->
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+
+                    <div class="alert {{ category }}">
+                        {{ message }}
+                    </div>
+
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+
+        <!-- SECURITY PIPELINE -->
+
+        <div class="pipeline">
+
+            <div class="pipeline-step active">
+                <div class="pipeline-number">01</div>
+                <div>
+                    <strong>PREPARE</strong>
+                    <span>Paper Security</span>
+                </div>
+            </div>
+
+            <div class="pipeline-line"></div>
+
+            <div class="pipeline-step">
+                <div class="pipeline-number">02</div>
+                <div>
+                    <strong>PROTECT</strong>
+                    <span>Key Release</span>
+                </div>
+            </div>
+
+            <div class="pipeline-line"></div>
+
+            <div class="pipeline-step">
+                <div class="pipeline-number">03</div>
+                <div>
+                    <strong>AUTHORIZE</strong>
+                    <span>Center Auth</span>
+                </div>
+            </div>
+
+            <div class="pipeline-line"></div>
+
+            <div class="pipeline-step">
+                <div class="pipeline-number">04</div>
+                <div>
+                    <strong>CONDUCT</strong>
+                    <span>Exam Session</span>
+                </div>
+            </div>
+
+            <div class="pipeline-line"></div>
+
+            <div class="pipeline-step">
+                <div class="pipeline-number">05</div>
+                <div>
+                    <strong>INTEGRITY</strong>
+                    <span>Audit & Merkle</span>
+                </div>
+            </div>
+
+            <div class="pipeline-line"></div>
+
+            <div class="pipeline-step">
+                <div class="pipeline-number">06</div>
+                <div>
+                    <strong>VERIFY</strong>
+                    <span>Final Check</span>
+                </div>
+            </div>
+
+        </div>
+
+
+        <!-- MAIN GRID -->
+
+        <div class="content-grid">
+
+            <!-- PREPARE PAPER -->
+
+            <section class="panel large-panel">
+
+                <div class="panel-header">
+
+                    <div>
+                        <div class="panel-label">MODULE 01</div>
+                        <h2>Secure Examination Paper</h2>
+                    </div>
+
+                    <div class="security-badge">
+                        AES-256-GCM
+                    </div>
+
+                </div>
+
+
+                <form
+                    action="/papers/prepare"
+                    method="POST"
+                    enctype="multipart/form-data"
+                >
+
+                    <!-- PAPER -->
+<div class="form-group">
+    <label>EXAMINATION PAPER</label>
+
+    <div class="upload-box" id="uploadBox">
+
+        <div class="upload-icon">📄</div>
+
+        <div class="upload-content">
+
+            <strong id="uploadTitle">
+                SELECT EXAMINATION PAPER
+            </strong>
+
+            <p id="uploadDescription">
+                Choose the question paper you want
+                ExamShield to secure and distribute.
+            </p>
+
+            <button
+                type="button"
+                class="choose-file-button"
+                onclick="document.getElementById('paperInput').click()"
+            >
+                Choose Paper
+            </button>
+
+            <div id="fileName" class="selected-file">
+                No file selected
+            </div>
+
+        </div>
+
+        <input
+            type="file"
+            id="paperInput"
+            name="paper"
+            accept=".pdf,.doc,.docx,.txt"
+            required
+            hidden
+        >
+
+    </div>
+</div>
+
+
+                    <!-- CENTERS -->
+
+                    <div class="form-group">
+
+                        <label>AUTHORIZED EXAM CENTERS</label>
+
+                        <input
+                            type="text"
+                            name="center_ids"
+                            placeholder="center_001, center_002"
+                            required
+                        >
+
+                        <small>
+                            Enter center IDs separated by commas.
+                        </small>
+
+                    </div>
+
+
+                    <!-- SECURITY OPERATIONS -->
+
+                    <div class="crypto-flow">
+
+                        <div class="crypto-item">
+                            <span class="crypto-icon">01</span>
+                            <div>
+                                <strong>AES-256-GCM</strong>
+                                <small>Paper encryption</small>
+                            </div>
+                        </div>
+
+                        <div class="crypto-arrow">→</div>
+
+                        <div class="crypto-item">
+                            <span class="crypto-icon">02</span>
+                            <div>
+                                <strong>RSA-OAEP</strong>
+                                <small>Key wrapping</small>
+                            </div>
+                        </div>
+
+                        <div class="crypto-arrow">→</div>
+
+                        <div class="crypto-item">
+                            <span class="crypto-icon">03</span>
+                            <div>
+                                <strong>HMAC-SHA256</strong>
+                                <small>Center watermark</small>
+                            </div>
+                        </div>
+
+                        <div class="crypto-arrow">→</div>
+
+                        <div class="crypto-item">
+                            <span class="crypto-icon">04</span>
+                            <div>
+                                <strong>RSA-PSS</strong>
+                                <small>Board signature</small>
+                            </div>
+                        </div>
+
+                    </div>
+
+
+                    <button type="submit" class="primary-button">
+                        🔐 Secure & Send Paper
+                    </button>
+
+                </form>
+
+            </section>
+
+
+            <!-- STATUS -->
+
+            <section class="panel">
+
+                <div class="panel-header">
+                    <div>
+                        <div class="panel-label">PACKAGE STATUS</div>
+                        <h2>Security State</h2>
+                    </div>
+                </div>
+
+
+                {% if package_ready %}
+
+                    <div class="success-state">
+
+                        <div class="success-icon">✓</div>
+
+                        <h3>Package Secured</h3>
+
+                        <p>
+                            The examination paper has been encrypted
+                            and prepared for authorized distribution.
+                        </p>
+
+                    </div>
+
+
+                    <div class="status-list">
+
+                        <div class="status-row">
+                            <span>Paper</span>
+                            <strong>{{ paper_name }}</strong>
+                        </div>
+
+                        <div class="status-row">
+                            <span>Centers</span>
+                            <strong>{{ center_ids|length }}</strong>
+                        </div>
+
+                        <div class="status-row">
+                            <span>Encryption</span>
+                            <strong>AES-256-GCM</strong>
+                        </div>
+
+                        <div class="status-row">
+                            <span>Key Wrapping</span>
+                            <strong>RSA-OAEP</strong>
+                        </div>
+
+                        <div class="status-row">
+                            <span>Watermark</span>
+                            <strong>HMAC-SHA256</strong>
+                        </div>
+
+                        <div class="status-row">
+                            <span>Signature</span>
+                            <strong>RSA-PSS</strong>
+                        </div>
+
+                    </div>
+
+                {% else %}
+
+                    <div class="empty-state">
+
+                        <div class="empty-icon">◈</div>
+
+                        <h3>Awaiting Paper</h3>
+
+                        <p>
+                            No secured examination package has been
+                            generated yet.
+                        </p>
+
+                    </div>
+
+                {% endif %}
+
+            </section>
+
+        </div>
+
+
+        <!-- WHAT HAPPENS -->
+
+        <section class="panel process-panel">
+
+            <div class="panel-label">SECURITY PROCESS</div>
+
+            <h2>What happens when you secure the paper?</h2>
+
+            <div class="process-grid">
+
+                <div>
+                    <span>01</span>
+                    <h3>Encrypt</h3>
+                    <p>
+                        The plaintext examination paper is protected
+                        using AES-256-GCM.
+                    </p>
+                </div>
+
+                <div>
+                    <span>02</span>
+                    <h3>Wrap</h3>
+                    <p>
+                        The AES key is wrapped using each center's
+                        RSA public key.
+                    </p>
+                </div>
+
+                <div>
+                    <span>03</span>
+                    <h3>Watermark</h3>
+                    <p>
+                        A center-specific HMAC watermark is embedded
+                        to support traceability.
+                    </p>
+                </div>
+
+                <div>
+                    <span>04</span>
+                    <h3>Sign</h3>
+                    <p>
+                        The board signs the canonical package metadata
+                        using RSA-PSS.
+                    </p>
+                </div>
+
+            </div>
+
+        </section>
+
+    </main>
+
+</div>
+<script>
+
+const paperInput = document.getElementById("paperInput");
+const fileName = document.getElementById("fileName");
+const uploadBox = document.getElementById("uploadBox");
+const uploadTitle = document.getElementById("uploadTitle");
+const uploadDescription = document.getElementById("uploadDescription");
+
+paperInput.addEventListener("change", function () {
+
+    if (this.files.length > 0) {
+
+        const file = this.files[0];
+
+        fileName.textContent = "✓ " + file.name;
+
+        uploadTitle.textContent = "PAPER SELECTED";
+
+        uploadDescription.textContent =
+            "This paper is ready to be secured by ExamShield.";
+
+        uploadBox.classList.add("file-selected");
+
+    } else {
+
+        fileName.textContent = "No file selected";
+
+        uploadTitle.textContent =
+            "SELECT EXAMINATION PAPER";
+
+        uploadDescription.textContent =
+            "Choose the question paper you want ExamShield to secure and distribute.";
+
+        uploadBox.classList.remove("file-selected");
+    }
+
+});
+
+</script>
+
+</body>
+</html>

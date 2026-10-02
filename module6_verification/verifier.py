@@ -204,3 +204,47 @@ def full_post_exam_verification(
         "audit_valid": audit_valid,
         "overall": overall,
     }
+def get_integrity_details(verification_result: dict) -> dict:
+    """
+    Convert verification results into human-readable tamper details
+    for the ExamShield web interface.
+    """
+
+    signature_valid = verification_result.get("signature_valid", False)
+    merkle_valid = verification_result.get("merkle_valid", False)
+    audit_valid = verification_result.get("audit_valid", False)
+
+    return {
+        "paper": {
+            "status": "VERIFIED" if signature_valid else "TAMPERED",
+            "message": (
+                "No tampering detected in the examination paper."
+                if signature_valid
+                else "Paper signature mismatch detected. The paper data may have been modified."
+            ),
+        },
+
+        "answers": {
+            "status": "VERIFIED" if merkle_valid else "TAMPERED",
+            "message": (
+                "All submitted answer data passed Merkle integrity verification."
+                if merkle_valid
+                else "Merkle root mismatch detected. Submitted answer data may have been modified."
+            ),
+        },
+
+        "audit": {
+            "status": "VERIFIED" if audit_valid else "TAMPERED",
+            "message": (
+                "Audit log hash chain is intact."
+                if audit_valid
+                else "Audit log hash-chain mismatch detected. Audit history may have been modified."
+            ),
+        },
+
+        "overall": {
+            "status": "INTACT" if (
+                signature_valid and merkle_valid and audit_valid
+            ) else "TAMPERING DETECTED"
+        },
+    }

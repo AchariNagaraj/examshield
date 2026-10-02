@@ -13,6 +13,10 @@ certs/*.key
 certs/*.crt
 data/*.enc
 data/*.bin
+data/*_exam_package.json
+data/exam_packages/
+data/reports/
+data/ui_uploads/
 *.env
 
 # keep folder placeholders
