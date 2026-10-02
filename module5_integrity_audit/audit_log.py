@@ -2,10 +2,12 @@
 Module 5 — Integrity & Audit Log
 Owner: Elisha
 
-Hash-chained audit log: every event (key release, answer submission,
-auth attempt, etc.) is appended with a hash linking it to the previous
-entry, making post-hoc tampering detectable.
+Hash-chained audit log: every event is linked to the previous entry,
+making post-hoc tampering detectable.
 """
+
+import hashlib
+import json
 
 
 class AuditLog:
@@ -13,7 +15,11 @@ class AuditLog:
 
     def __init__(self):
         """Initialize an empty audit log with a genesis hash."""
-        raise NotImplementedError
+        self._genesis_hash = hashlib.sha256(
+            b"EXAMSHIELD-GENESIS"
+        ).digest()
+
+        self._chain = []
 
     def add_entry(self, event: str, metadata: dict) -> bytes:
         """
@@ -22,37 +28,102 @@ class AuditLog:
         hash_i = SHA256(hash_{i-1} + serialized(event, metadata))
 
         Args:
-            event: short event name/type (e.g. "KEY_RELEASED", "ANSWER_SUBMITTED").
-            metadata: event-specific details (center_id, timestamp, etc.).
+            event: short event name/type.
+            metadata: event-specific details.
 
         Returns:
-            the new entry's hash (becomes the chain head).
+            the new entry's hash.
         """
-        raise NotImplementedError
+        if not isinstance(event, str):
+            raise TypeError("Event must be a string.")
+
+        if not isinstance(metadata, dict):
+            raise TypeError("Metadata must be a dictionary.")
+
+        if self._chain:
+            previous_hash = self._chain[-1]["hash"]
+        else:
+            previous_hash = self._genesis_hash
+
+        serialized_data = json.dumps(
+            {
+                "event": event,
+                "metadata": metadata
+            },
+            sort_keys=True,
+            separators=(",", ":")
+        ).encode("utf-8")
+
+        entry_hash = hashlib.sha256(
+            previous_hash + serialized_data
+        ).digest()
+
+        entry = {
+            "event": event,
+            "metadata": metadata,
+            "hash": entry_hash,
+            "prev_hash": previous_hash
+        }
+
+        self._chain.append(entry)
+
+        return entry_hash
 
     def get_chain(self) -> list[dict]:
         """
         Return the full ordered list of log entries.
-
-        Returns:
-            list of dicts, each containing event, metadata, hash, prev_hash.
         """
-        raise NotImplementedError
+        return self._chain.copy()
 
     def verify_chain(self) -> bool:
         """
-        Recompute all hashes in order and check the chain is unbroken.
+        Recompute all hashes and check that the chain is unbroken.
 
         Returns:
-            True if no entry has been tampered with or removed.
+            True if the chain is intact.
         """
-        raise NotImplementedError
+        previous_hash = self._genesis_hash
+
+        for entry in self._chain:
+            serialized_data = json.dumps(
+                {
+                    "event": entry["event"],
+                    "metadata": entry["metadata"]
+                },
+                sort_keys=True,
+                separators=(",", ":")
+            ).encode("utf-8")
+
+            expected_hash = hashlib.sha256(
+                previous_hash + serialized_data
+            ).digest()
+
+            if entry["prev_hash"] != previous_hash:
+                return False
+
+            if entry["hash"] != expected_hash:
+                return False
+
+            previous_hash = entry["hash"]
+
+        return True
 
     def export_log(self, path: str) -> None:
         """
-        Write the full audit chain to disk (e.g. as JSON).
-
-        Args:
-            path: output file path.
+        Write the full audit chain to disk as JSON.
         """
-        raise NotImplementedError
+
+        export_data = []
+
+        for entry in self._chain:
+            export_data.append(
+                {
+                    "event": entry["event"],
+                    "metadata": entry["metadata"],
+                    "hash": entry["hash"].hex(),
+                    "prev_hash": entry["prev_hash"].hex()
+                }
+            )
+
+        with open(path, "w", encoding="utf-8") as file:
+            json.dump(export_data, file, indent=2)
