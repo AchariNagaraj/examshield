@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>ExamShield | Integrity & Audit</title>
+    <link rel="stylesheet"
+          href="{{ url_for('static', filename='style.css') }}">
+</head>
+
+<body>
+
+<div class="app-layout">
+
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+
+        <div class="brand">
+            <div class="brand-icon">🛡</div>
+
+            <div>
+                <div class="brand-name">ExamShield</div>
+                <div class="brand-subtitle">SECURE EXAM SYSTEM</div>
+            </div>
+        </div>
+
+        <div class="sidebar-section">
+
+            <div class="sidebar-label">COMMAND CENTER</div>
+
+            <a class="nav-item" href="/">
+                <span>⌂</span> Dashboard
+            </a>
+
+            <a class="nav-item" href="/papers">
+                <span>▣</span> Exam Papers
+            </a>
+
+            <a class="nav-item" href="/centers">
+                <span>◉</span> Center Authorization
+            </a>
+
+            <a class="nav-item" href="/key-release">
+                <span>🔑</span> Key Release
+            </a>
+
+            <a class="nav-item" href="/sessions">
+                <span>◫</span> Exam Sessions
+            </a>
+
+            <a class="nav-item active" href="/integrity">
+                <span>◇</span> Integrity & Audit
+            </a>
+
+            <a class="nav-item" href="/verification">
+                <span>✓</span> Verification
+            </a>
+
+            <a class="nav-item" href="/reports">
+                <span>▤</span> Reports
+            </a>
+
+        </div>
+
+        <div class="sidebar-bottom">
+            <div class="system-status">
+                <span class="status-dot"></span>
+                SYSTEM SECURE
+            </div>
+        </div>
+
+    </aside>
+
+
+    <!-- MAIN CONTENT -->
+    <main class="main-content">
+
+        <header class="topbar">
+
+            <div>
+                <p class="eyebrow">MODULE 5</p>
+
+                <h2>Integrity & Audit</h2>
+
+                <p class="subtitle">
+                    Verify answer integrity using a Merkle tree and tamper-evident audit log.
+                </p>
+            </div>
+
+        </header>
+
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+
+            {% if messages %}
+
+                {% for category, message in messages %}
+
+                    <div class="flash {{ category }}">
+                        {{ message }}
+                    </div>
+
+                {% endfor %}
+
+            {% endif %}
+
+        {% endwith %}
+
+
+        <section class="panel">
+
+            <div class="panel-header">
+
+                <div>
+                    <span class="panel-label">INTEGRITY ENGINE</span>
+                    <h3>Post-Exam Integrity Check</h3>
+                </div>
+
+                <span class="badge {{ 'green' if integrity_verified else 'red' }}">
+                    {{ 'VERIFIED' if integrity_verified else 'WAITING' }}
+                </span>
+
+            </div>
+
+
+            <div class="verification-list">
+
+                <div>
+                    <span>Merkle Root</span>
+
+                    <b>
+                        {% if merkle_root %}
+                            {{ merkle_root[:24] }}...
+                        {% else %}
+                            NOT GENERATED
+                        {% endif %}
+                    </b>
+                </div>
+
+
+                <div>
+                    <span>Audit Log Entries</span>
+
+                    <b>
+                        {{ audit_log|length if audit_log else 0 }}
+                    </b>
+                </div>
+
+
+                <div>
+                    <span>Audit Chain</span>
+
+                    <b>
+                        {{ '✓ VALID' if integrity_verified else 'NOT VERIFIED' }}
+                    </b>
+                </div>
+
+
+                <div>
+                    <span>Integrity Method</span>
+                    <b>SHA-256 + Merkle Tree</b>
+                </div>
+
+            </div>
+
+
+            <br>
+
+
+            <form method="POST"
+                  action="{{ url_for('generate_integrity') }}">
+
+                <button class="primary-btn" type="submit">
+                    🔐 Generate Integrity Proof
+                </button>
+
+            </form>
+
+        </section>
+
+    </main>
+
+</div>
+
+</body>
+</html>

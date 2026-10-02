@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>ExamShield | Key Release</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+
+<body>
+
+<div class="app-layout">
+
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+
+        <div class="brand">
+            <div class="brand-icon">🛡</div>
+            <div>
+                <div class="brand-name">ExamShield</div>
+                <div class="brand-subtitle">SECURE EXAM SYSTEM</div>
+            </div>
+        </div>
+
+        <div class="sidebar-section">
+            <div class="sidebar-label">COMMAND CENTER</div>
+
+            <a class="nav-item" href="/">
+                <span>⌂</span> Dashboard
+            </a>
+
+            <a class="nav-item" href="/papers">
+                <span>▣</span> Exam Papers
+            </a>
+
+            <a class="nav-item" href="/centers">
+                <span>◉</span> Center Authorization
+            </a>
+
+            <a class="nav-item active" href="/key-release">
+                <span>🔑</span> Key Release
+            </a>
+
+            <a class="nav-item" href="/sessions">
+                <span>◫</span> Exam Sessions
+            </a>
+
+            <a class="nav-item" href="/integrity">
+                <span>◇</span> Integrity & Audit
+            </a>
+
+            <a class="nav-item" href="/verification">
+                <span>✓</span> Verification
+            </a>
+
+            <a class="nav-item" href="/reports">
+                <span>▤</span> Reports
+            </a>
+
+        </div>
+
+        <div class="sidebar-bottom">
+            <div class="system-status">
+                <span class="status-dot"></span>
+                SYSTEM SECURE
+            </div>
+        </div>
+
+    </aside>
+
+
+    <!-- MAIN CONTENT -->
+    <main class="main-content">
+
+        <header class="topbar">
+            <div>
+                <p class="eyebrow">MODULE 2</p>
+                <h2>Controlled Key Release</h2>
+                <p class="subtitle">
+                    Release the examination decryption key only when security conditions are satisfied.
+                </p>
+            </div>
+        </header>
+
+
+        <!-- FLASH MESSAGES -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="flash {{ category }}">
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+
+        <section class="panel">
+
+            <div class="panel-header">
+
+                <div>
+                    <span class="panel-label">SECURITY CHECKPOINT</span>
+
+                   <h3>Select Examination Center</h3>
+
+<select name="center_id" form="key-release-form" required>
+    {% for center in centers %}
+        <option value="{{ center }}"
+                {% if center == center_id %}selected{% endif %}>
+            {{ center }}
+        </option>
+    {% endfor %}
+</select>
+                </div>
+
+                <span class="badge {{ 'green' if approved else 'red' }}">
+                    {{ 'APPROVED' if approved else 'WAITING' }}
+                </span>
+
+            </div>
+
+
+            <div class="verification-list">
+
+                <div>
+                    <span>Board Timestamp</span>
+                    <b>{{ '✓ VALID' if timestamp_valid else '✗ INVALID' }}</b>
+                </div>
+
+                <div>
+                    <span>Center Certificate</span>
+                    <b>{{ '✓ VALID' if certificate_valid else '✗ INVALID' }}</b>
+                </div>
+
+                <div>
+                    <span>Anomaly Score</span>
+                    <b>{{ anomaly_score }}</b>
+                </div>
+
+                <div>
+                    <span>Allowed Threshold</span>
+                    <b>{{ threshold }}</b>
+                </div>
+
+            </div>
+
+
+            <br>
+
+
+            <form id="key-release-form"
+                method="POST"
+                action="{{ url_for('authorize_key_release') }}">
+
+                <button class="primary-btn" type="submit">
+                    🔑 Authorize Key Release
+                </button>
+
+            </form>
+
+        </section>
+
+    </main>
+
+</div>
+
+</body>
+</html>

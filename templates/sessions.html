@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>ExamShield | Exam Sessions</title>
+    <link rel="stylesheet"
+          href="{{ url_for('static', filename='style.css') }}">
+</head>
+
+<body>
+
+<div class="app-layout">
+
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+
+        <div class="brand">
+            <div class="brand-icon">🛡</div>
+
+            <div>
+                <div class="brand-name">ExamShield</div>
+                <div class="brand-subtitle">SECURE EXAM SYSTEM</div>
+            </div>
+        </div>
+
+        <div class="sidebar-section">
+
+            <div class="sidebar-label">COMMAND CENTER</div>
+
+            <a class="nav-item" href="/">
+                <span>⌂</span> Dashboard
+            </a>
+
+            <a class="nav-item" href="/papers">
+                <span>▣</span> Exam Papers
+            </a>
+
+            <a class="nav-item" href="/centers">
+                <span>◉</span> Center Authorization
+            </a>
+
+            <a class="nav-item" href="/key-release">
+                <span>🔑</span> Key Release
+            </a>
+
+            <a class="nav-item active" href="/sessions">
+                <span>◫</span> Exam Sessions
+            </a>
+
+            <a class="nav-item" href="/integrity">
+                <span>◇</span> Integrity & Audit
+            </a>
+
+            <a class="nav-item" href="/verification">
+                <span>✓</span> Verification
+            </a>
+
+            <a class="nav-item" href="/reports">
+                <span>▤</span> Reports
+            </a>
+
+        </div>
+
+        <div class="sidebar-bottom">
+            <div class="system-status">
+                <span class="status-dot"></span>
+                SYSTEM SECURE
+            </div>
+        </div>
+
+    </aside>
+
+
+    <!-- MAIN CONTENT -->
+    <main class="main-content">
+
+        <header class="topbar">
+
+            <div>
+                <p class="eyebrow">MODULE 4</p>
+
+                <h2>Secure Exam Session</h2>
+
+                <p class="subtitle">
+                    Establish a session key and securely collect examination answers.
+                </p>
+            </div>
+
+        </header>
+
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+
+            {% if messages %}
+
+                {% for category, message in messages %}
+
+                    <div class="flash {{ category }}">
+                        {{ message }}
+                    </div>
+
+                {% endfor %}
+
+            {% endif %}
+
+        {% endwith %}
+
+
+        <section class="panel">
+
+            <div class="panel-header">
+
+                <div>
+                    <span class="panel-label">EXAM SESSION</span>
+                    <h3>Select Examination Center</h3>
+
+<select name="center_id" form="session-form" required>
+    {% for center in centers %}
+        <option value="{{ center }}"
+                {% if center == center_id %}selected{% endif %}>
+            {{ center }}
+        </option>
+    {% endfor %}
+</select>
+                </div>
+
+                <span class="badge {{ 'green' if session_established else 'red' }}">
+                    {{ 'ACTIVE' if session_established else 'NOT STARTED' }}
+                </span>
+
+            </div>
+
+
+            <div class="verification-list">
+
+                <div>
+                    <span>Session Key Exchange</span>
+
+                    <b>
+                        {{ '✓ ESTABLISHED' if session_established else 'WAITING' }}
+                    </b>
+                </div>
+
+
+                <div>
+                    <span>Key Agreement</span>
+                    <b>Diffie-Hellman</b>
+                </div>
+
+
+                <div>
+                    <span>Encryption</span>
+                    <b>AES-256</b>
+                </div>
+
+
+                <div>
+                    <span>Answers Collected</span>
+                    <b>{{ answers_collected }}</b>
+                </div>
+
+            </div>
+
+
+            <br>
+
+
+           <form id="session-form"
+      method="POST"
+      action="{{ url_for('start_session') }}">
+
+                <button class="primary-btn" type="submit">
+                    🔐 Start Secure Exam Session
+                </button>
+
+            </form>
+
+        </section>
+
+    </main>
+
+</div>
+
+</body>
+</html>

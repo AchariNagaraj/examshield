@@ -1,0 +1,5 @@
+EXAMSHIELD DEMO EXAM
+
+Question 1: Explain the purpose of AES encryption.
+Question 2: What is a Merkle Tree?
+Question 3: Explain how a hash chain protects an audit log.

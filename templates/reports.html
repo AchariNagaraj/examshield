@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>ExamShield | Reports</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+
+<body>
+
+<div class="app-layout">
+
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+
+        <div class="brand">
+            <div class="brand-icon">🛡</div>
+
+            <div>
+                <div class="brand-name">ExamShield</div>
+                <div class="brand-subtitle">SECURE EXAM SYSTEM</div>
+            </div>
+        </div>
+
+        <div class="sidebar-section">
+
+            <div class="sidebar-label">COMMAND CENTER</div>
+
+            <a class="nav-item" href="/">
+                <span>⌂</span> Dashboard
+            </a>
+
+            <a class="nav-item" href="/papers">
+                <span>▣</span> Exam Papers
+            </a>
+
+            <a class="nav-item" href="/centers">
+                <span>◉</span> Center Authorization
+            </a>
+
+            <a class="nav-item" href="/key-release">
+                <span>🔑</span> Key Release
+            </a>
+
+            <a class="nav-item" href="/sessions">
+                <span>◫</span> Exam Sessions
+            </a>
+
+            <a class="nav-item" href="/integrity">
+                <span>◇</span> Integrity & Audit
+            </a>
+
+            <a class="nav-item" href="/verification">
+                <span>✓</span> Verification
+            </a>
+
+            <a class="nav-item active" href="/reports">
+                <span>▤</span> Reports
+            </a>
+
+        </div>
+
+        <div class="sidebar-bottom">
+            <div class="system-status">
+                <span class="status-dot"></span>
+                SYSTEM SECURE
+            </div>
+        </div>
+
+    </aside>
+
+
+    <!-- MAIN CONTENT -->
+    <main class="main-content">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+            <div class="flash-messages">
+                {% for category, message in messages %}
+                    <div class="flash-message {{ category }}">
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+    {% endwith %}
+
+        <header class="topbar">
+
+            <div>
+                <p class="eyebrow">REPORTING</p>
+
+                <h2>Integrity Reports</h2>
+
+                <p class="subtitle">
+                    Examination security and post-exam verification reports.
+                </p>
+            </div>
+
+        </header>
+
+
+        <section class="panel">
+
+            <div class="panel-header">
+
+                <div>
+                    <span class="panel-label">EXAMSHIELD REPORT</span>
+                    <h3>{{ verification_result.center_id if verification_result else center_id }}</h3>
+                </div>
+
+                <span class="badge green">
+                    VERIFIED
+                </span>
+
+            </div>
+
+
+            <div class="security-details">
+
+                <div>
+    <span>Paper Signature</span>
+    <strong>
+        {% if verification_result %}
+            {{ 'PASS' if verification_result.signature_valid else 'FAIL' }}
+        {% else %}
+            WAITING
+        {% endif %}
+    </strong>
+</div>
+                <div>
+    <span>Merkle Verification</span>
+    <strong>
+        {% if verification_result %}
+            {{ 'PASS' if verification_result.merkle_valid else 'FAIL' }}
+        {% else %}
+            WAITING
+        {% endif %}
+    </strong>
+</div>
+
+                <div>
+    <span>Audit Verification</span>
+    <strong>
+        {% if verification_result %}
+            {{ 'PASS' if verification_result.audit_valid else 'FAIL' }}
+        {% else %}
+            WAITING
+        {% endif %}
+    </strong>
+</div>
+
+                <div>
+    <span>Overall Integrity</span>
+    <strong>
+        {% if verification_result %}
+            {{ 'PASS' if verification_result.overall else 'FAIL' }}
+        {% else %}
+            WAITING
+        {% endif %}
+    </strong>
+</div>
+
+            </div>
+
+
+           <form method="POST" action="{{ url_for('generate_report') }}">
+    <button class="primary-btn" type="submit">
+        📑 Generate Integrity Report
+    </button>
+</form>
+
+{% if report_text %}
+    <br>
+
+    <a href="{{ url_for('download_report') }}"
+       class="primary-btn"
+       style="display:block; text-align:center; text-decoration:none;">
+        ⬇ Download Integrity Report
+    </a>
+{% endif %}
+
+        </section>
+
+    </main>
+
+</div>
+
+</body>
+</html>

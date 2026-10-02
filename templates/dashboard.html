@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>ExamShield | Security Command Center</title>
+
+    <link rel="stylesheet"
+          href="{{ url_for('static', filename='style.css') }}">
+</head>
+
+<body>
+
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+
+        <div class="brand">
+            <div class="shield">🛡</div>
+
+            <div>
+                <h1>ExamShield</h1>
+                <span>Secure Examination System</span>
+            </div>
+        </div>
+
+        <nav>
+
+    <a class="nav-item active" href="/">
+        <span>📊</span>
+        Dashboard
+    </a>
+
+    <a class="nav-item" href="/papers">
+        <span>📄</span>
+        Exam Papers
+    </a>
+
+    <a class="nav-item" href="/centers">
+        <span>🏫</span>
+        Center Authorization
+    </a>
+
+    <a class="nav-item" href="/key-release">
+        <span>🔑</span>
+        Key Release
+    </a>
+
+    <a class="nav-item" href="/sessions">
+        <span>📝</span>
+        Exam Sessions
+    </a>
+
+    <a class="nav-item" href="/integrity">
+        <span>🌳</span>
+        Integrity & Audit
+    </a>
+
+    <a class="nav-item" href="/verification">
+        <span>🔍</span>
+        Verification
+    </a>
+
+    <a class="nav-item" href="/reports">
+        <span>📑</span>
+        Reports
+    </a>
+
+</nav>
+
+        <div class="system-status">
+            <div class="status-dot"></div>
+
+            <div>
+                <strong>System Secure</strong>
+                <small>All security services operational</small>
+            </div>
+        </div>
+
+    </aside>
+
+
+    <!-- MAIN CONTENT -->
+    <main class="main">
+
+        <!-- TOP BAR -->
+        <header class="topbar">
+
+            <div>
+                <p class="eyebrow">SECURITY COMMAND CENTER</p>
+
+                <h2>ExamShield Dashboard</h2>
+
+                <p class="subtitle">
+                    Secure examination paper distribution and integrity monitoring
+                </p>
+            </div>
+
+            <div class="top-right">
+
+                <div class="center-badge">
+                    {{ center_id }}
+                </div>
+
+                <div class="verified">
+                    ● VERIFIED
+                </div>
+
+            </div>
+
+        </header>
+
+
+        <!-- PIPELINE -->
+        <section class="pipeline-section">
+
+            <div class="section-heading">
+                <div>
+                    <h3>Exam Security Pipeline</h3>
+
+                    <p>
+                        End-to-end protection of examination papers and submitted answers
+                    </p>
+                </div>
+            </div>
+
+
+            <div class="pipeline">
+
+                <div class="pipeline-step completed">
+                    <div class="step-number">01</div>
+                    <div class="step-icon">📄</div>
+                    <strong>Prepare</strong>
+                    <span>Paper Security</span>
+                </div>
+
+                <div class="pipeline-line completed-line"></div>
+
+                <div class="pipeline-step completed">
+                    <div class="step-number">02</div>
+                    <div class="step-icon">🔑</div>
+                    <strong>Protect</strong>
+                    <span>Key Release</span>
+                </div>
+
+                <div class="pipeline-line completed-line"></div>
+
+                <div class="pipeline-step completed">
+                    <div class="step-number">03</div>
+                    <div class="step-icon">🏫</div>
+                    <strong>Authorize</strong>
+                    <span>Center Auth</span>
+                </div>
+
+                <div class="pipeline-line completed-line"></div>
+
+                <div class="pipeline-step completed">
+                    <div class="step-number">04</div>
+                    <div class="step-icon">📝</div>
+                    <strong>Conduct</strong>
+                    <span>Exam Session</span>
+                </div>
+
+                <div class="pipeline-line completed-line"></div>
+
+                <div class="pipeline-step completed">
+                    <div class="step-number">05</div>
+                    <div class="step-icon">🌳</div>
+                    <strong>Integrity</strong>
+                    <span>Audit & Merkle</span>
+                </div>
+
+                <div class="pipeline-line completed-line"></div>
+
+                <div class="pipeline-step completed">
+                    <div class="step-number">06</div>
+                    <div class="step-icon">🔍</div>
+                    <strong>Verify</strong>
+                    <span>Final Check</span>
+                </div>
+
+            </div>
+
+        </section>
+
+
+        <!-- OVERVIEW CARDS -->
+        <section class="cards">
+
+            <div class="security-card">
+
+                <div class="card-icon">📄</div>
+
+                <div class="card-content">
+
+                    <span>EXAM PAPER</span>
+
+                    <h3>SECURED</h3>
+
+                    <p>AES-256-GCM + RSA</p>
+
+                </div>
+
+                <div class="check">✓</div>
+
+            </div>
+
+
+            <div class="security-card">
+
+                <div class="card-icon">🏫</div>
+
+                <div class="card-content">
+
+                    <span>CENTER AUTHENTICATION</span>
+
+                    <h3>VERIFIED</h3>
+
+                    <p>PKI + Mutual TLS</p>
+
+                </div>
+
+                <div class="check">✓</div>
+
+            </div>
+
+
+            <div class="security-card">
+
+                <div class="card-icon">🔑</div>
+
+                <div class="card-content">
+
+                    <span>KEY RELEASE</span>
+
+                    <h3>APPROVED</h3>
+
+                    <p>Controlled Release</p>
+
+                </div>
+
+                <div class="check">✓</div>
+
+            </div>
+
+
+            <div class="security-card">
+
+                <div class="card-icon">📝</div>
+
+                <div class="card-content">
+
+                    <span>EXAM SESSION</span>
+
+                    <h3>ACTIVE</h3>
+
+                    <p>DH Secure Session</p>
+
+                </div>
+
+                <div class="check">✓</div>
+
+            </div>
+
+        </section>
+
+
+        <!-- TWO COLUMN AREA -->
+        <section class="content-grid">
+
+
+            <!-- PAPER DISTRIBUTION -->
+            <div class="panel">
+
+                <div class="panel-header">
+
+                    <div>
+                        <span class="panel-label">MODULE 1</span>
+                        <h3>Secure Paper Distribution</h3>
+                    </div>
+
+                    <span class="badge green">
+                        SECURED
+                    </span>
+
+                </div>
+
+
+                <div class="paper-box">
+
+                    <div class="file-icon">
+                        📄
+                    </div>
+
+                    <div>
+
+                        <strong>
+                            Cryptography_Network_Security.pdf
+                        </strong>
+
+                        <p>
+                            Examination Question Paper
+                        </p>
+
+                    </div>
+
+                </div>
+
+
+                <div class="security-details">
+
+                    <div>
+                        <span>Encryption</span>
+                        <strong>AES-256-GCM</strong>
+                    </div>
+
+                    <div>
+                        <span>Key Protection</span>
+                        <strong>RSA-OAEP</strong>
+                    </div>
+
+                    <div>
+                        <span>Integrity</span>
+                        <strong>SHA-256</strong>
+                    </div>
+
+                    <div>
+                        <span>Signature</span>
+                        <strong>RSA ✓</strong>
+                    </div>
+
+                </div>
+
+
+                <button class="primary-btn">
+                    🔐 Secure & Send Paper
+                </button>
+
+            </div>
+
+
+            <!-- CENTER AUTH -->
+            <div class="panel">
+
+                <div class="panel-header">
+
+                    <div>
+                        <span class="panel-label">MODULE 3</span>
+                        <h3>Center Authorization</h3>
+                    </div>
+
+                    <span class="badge green">
+                        VERIFIED
+                    </span>
+
+                </div>
+
+
+                <div class="center-info">
+
+                    <div class="center-avatar">
+                        🏫
+                    </div>
+
+                    <div>
+                        <strong>{{ center_id }}</strong>
+
+                        <p>
+                            Examination Center
+                        </p>
+                    </div>
+
+                </div>
+
+
+                <div class="verification-list">
+
+                    <div>
+                        <span>Certificate</span>
+                        <b>✓ VALID</b>
+                    </div>
+
+                    <div>
+                        <span>Root CA</span>
+                        <b>✓ VERIFIED</b>
+                    </div>
+
+                    <div>
+                        <span>mTLS Authentication</span>
+                        <b>✓ VERIFIED</b>
+                    </div>
+
+                    <div>
+                        <span>Center Identity</span>
+                        <b>✓ CONFIRMED</b>
+                    </div>
+
+                </div>
+
+            </div>
+
+
+        </section>
+
+
+        <!-- INTEGRITY -->
+        <section class="panel integrity-panel">
+
+            <div class="panel-header">
+
+                <div>
+
+                    <span class="panel-label">
+                        MODULE 5 + MODULE 6
+                    </span>
+
+                    <h3>
+                        Post-Exam Integrity Verification
+                    </h3>
+
+                </div>
+
+                <span class="badge green">
+                    ALL CHECKS PASSED
+                </span>
+
+            </div>
+
+
+            <div class="integrity-grid">
+
+                <div class="integrity-item">
+
+                    <span>Paper Signature</span>
+
+                    <strong>✓ VERIFIED</strong>
+
+                </div>
+
+                <div class="integrity-item">
+
+                    <span>Merkle Root</span>
+
+                    <strong>✓ VERIFIED</strong>
+
+                </div>
+
+                <div class="integrity-item">
+
+                    <span>Audit Chain</span>
+
+                    <strong>✓ VERIFIED</strong>
+
+                </div>
+
+                <div class="integrity-item">
+
+                    <span>Answers Collected</span>
+
+                    <strong>2</strong>
+
+                </div>
+
+            </div>
+
+
+            <div class="overall-status">
+
+                <div class="overall-icon">
+                    ✓
+                </div>
+
+                <div>
+
+                    <span>OVERALL INTEGRITY</span>
+
+                    <h2>PASS</h2>
+
+                </div>
+
+                <button class="secondary-btn">
+                    View Verification Report →
+                </button>
+
+            </div>
+
+        </section>
+
+
+        <footer>
+            ExamShield • Secure Examination Paper Distribution System
+        </footer>
+
+    </main>
+
+</body>
+</html>

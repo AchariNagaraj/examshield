@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>ExamShield | Center Authorization</title>
+    <link rel="stylesheet"
+          href="{{ url_for('static', filename='style.css') }}">
+</head>
+
+<body>
+
+<div class="app-layout">
+
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+
+        <div class="brand">
+            <div class="brand-icon">🛡</div>
+
+            <div>
+                <div class="brand-name">ExamShield</div>
+                <div class="brand-subtitle">SECURE EXAM SYSTEM</div>
+            </div>
+        </div>
+
+        <div class="sidebar-section">
+
+            <div class="sidebar-label">COMMAND CENTER</div>
+
+            <a class="nav-item" href="/">
+                <span>⌂</span> Dashboard
+            </a>
+
+            <a class="nav-item" href="/papers">
+                <span>▣</span> Exam Papers
+            </a>
+
+            <a class="nav-item active" href="/centers">
+                <span>◉</span> Center Authorization
+            </a>
+
+            <a class="nav-item" href="/key-release">
+                <span>🔑</span> Key Release
+            </a>
+
+            <a class="nav-item" href="/sessions">
+                <span>◫</span> Exam Sessions
+            </a>
+
+            <a class="nav-item" href="/integrity">
+                <span>◇</span> Integrity & Audit
+            </a>
+
+            <a class="nav-item" href="/verification">
+                <span>✓</span> Verification
+            </a>
+
+            <a class="nav-item" href="/reports">
+                <span>▤</span> Reports
+            </a>
+
+        </div>
+
+        <div class="sidebar-bottom">
+            <div class="system-status">
+                <span class="status-dot"></span>
+                SYSTEM SECURE
+            </div>
+        </div>
+
+    </aside>
+
+
+    <!-- MAIN CONTENT -->
+    <main class="main-content">
+
+        <header class="topbar">
+
+            <div>
+                <p class="eyebrow">MODULE 3</p>
+
+                <h2>Center Authorization</h2>
+
+                <p class="subtitle">
+                    Authenticate the examination center before allowing secure
+                    communication with the examination board.
+                </p>
+            </div>
+
+        </header>
+
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+
+            {% if messages %}
+
+                {% for category, message in messages %}
+
+                    <div class="flash {{ category }}">
+                        {{ message }}
+                    </div>
+
+                {% endfor %}
+
+            {% endif %}
+
+        {% endwith %}
+
+
+        <section class="panel">
+
+            <div class="panel-header">
+
+                <div>
+
+                    <span class="panel-label">
+                        CENTER IDENTITY
+                    </span>
+
+                    <h3>{{ center_id }}</h3>
+
+                </div>
+
+
+                <span class="badge {{ 'green' if authenticated else 'red' }}">
+                    {{ 'AUTHORIZED' if authenticated else 'NOT VERIFIED' }}
+                </span>
+
+            </div>
+
+
+            <div class="verification-list">
+
+                <div>
+                    <span>Center Certificate</span>
+
+                    <b>
+                        {{ '✓ VALID' if authenticated else '✗ NOT VERIFIED' }}
+                    </b>
+                </div>
+
+
+                <div>
+                    <span>Root CA</span>
+
+                    <b>
+                        {{ '✓ TRUSTED' if authenticated else '✗ NOT VERIFIED' }}
+                    </b>
+                </div>
+
+
+                <div>
+                    <span>Certificate Status</span>
+
+                    <b>{{ certificate_status }}</b>
+                </div>
+
+
+                <div>
+                    <span>Authentication Method</span>
+
+                    <b>PKI + mTLS</b>
+                </div>
+
+            </div>
+
+
+            <br>
+
+
+           {% for center in centers %}
+    <div class="center-card">
+
+        <h3>{{ center }}</h3>
+
+        <form method="POST"
+              action="{{ url_for('authorize_center') }}">
+
+            <input type="hidden"
+                   name="center_id"
+                   value="{{ center }}">
+
+            <button class="primary-btn" type="submit">
+                🔐 Authenticate {{ center }}
+            </button>
+
+        </form>
+
+    </div>
+{% endfor %}
+        </section>
+        <section class="panel">
+    <div class="panel-header">
+        <div>
+            <span class="panel-label">CENTER MANAGEMENT</span>
+            <h3>Register New Exam Center</h3>
+        </div>
+    </div>
+
+    <p class="subtitle">
+        Register a new examination center by issuing a unique certificate
+        signed by the ExamShield Root CA.
+    </p>
+
+    <form method="POST" action="{{ url_for('register_center') }}">
+        <div class="form-group">
+            <label for="center_id">Center ID</label>
+            <input
+                type="text"
+                id="center_id"
+                name="center_id"
+                placeholder="Example: center_002"
+                required
+            >
+        </div>
+
+        <button class="primary-btn" type="submit">
+            + Register Center
+        </button>
+    </form>
+</section>
+
+    </main>
+
+</div>
+
+</body>
+</html>
