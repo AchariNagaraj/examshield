@@ -6,13 +6,22 @@ Ephemeral Diffie-Hellman key exchange, generating a fresh session key
 for every exam session to provide forward secrecy.
 """
 
+from functools import lru_cache
+import secrets
+
+from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric.dh import (
     DHParameters,
     DHPrivateKey,
     DHPublicKey,
+    generate_parameters,
 )
+from cryptography.hazmat.primitives.kdf.hkdf import HKDF
+
+from common.constants import AES_KEY_SIZE_BYTES, SESSION_ID_LENGTH
 
 
+@lru_cache(maxsize=1)
 def generate_dh_parameters() -> DHParameters:
     """
     Generate (or load standard) Diffie-Hellman domain parameters.
@@ -20,7 +29,7 @@ def generate_dh_parameters() -> DHParameters:
     Returns:
         DHParameters shared between board and centers.
     """
-    raise NotImplementedError
+    return generate_parameters(generator=2, key_size=2048)
 
 
 def generate_dh_keypair(parameters: DHParameters) -> tuple[DHPrivateKey, DHPublicKey]:
@@ -33,7 +42,8 @@ def generate_dh_keypair(parameters: DHParameters) -> tuple[DHPrivateKey, DHPubli
     Returns:
         (private_key, public_key)
     """
-    raise NotImplementedError
+    private_key = parameters.generate_private_key()
+    return private_key, private_key.public_key()
 
 
 def derive_shared_key(private_key: DHPrivateKey, peer_public_key: DHPublicKey) -> bytes:
@@ -47,7 +57,13 @@ def derive_shared_key(private_key: DHPrivateKey, peer_public_key: DHPublicKey) -
     Returns:
         derived symmetric session key (post-KDF), suitable for AES.
     """
-    raise NotImplementedError
+    shared_secret = private_key.exchange(peer_public_key)
+    return HKDF(
+        algorithm=hashes.SHA256(),
+        length=AES_KEY_SIZE_BYTES,
+        salt=None,
+        info=b"ExamShield DH session key",
+    ).derive(shared_secret)
 
 
 def start_new_session(center_id: str) -> dict:
@@ -61,4 +77,15 @@ def start_new_session(center_id: str) -> dict:
     Returns:
         dict with session_id, DH keypair, and metadata.
     """
-    raise NotImplementedError
+    if not isinstance(center_id, str) or not center_id.strip():
+        raise ValueError("center_id must be a non-empty string")
+
+    parameters = generate_dh_parameters()
+    private_key, public_key = generate_dh_keypair(parameters)
+    return {
+        "session_id": secrets.token_hex(SESSION_ID_LENGTH),
+        "parameters": parameters,
+        "private_key": private_key,
+        "public_key": public_key,
+        "metadata": {"center_id": center_id},
+    }
