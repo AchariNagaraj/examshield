@@ -77,6 +77,9 @@ demo_state = {
 
     "session": None,
     "session_established": False,
+    "exam_active": False,
+    "exam_ended": False,
+    "exam_end_time": None,
     "answers_collected": 0,
 
     "merkle_root": None,
@@ -513,7 +516,98 @@ def sessions():
         center_id=demo_state["center_id"],
         session_established=demo_state["session_established"],
         answers_collected=demo_state["answers_collected"],
+        exam_active=demo_state["exam_active"],
+        exam_ended=demo_state["exam_ended"],
+        exam_end_time=demo_state["exam_end_time"],  
     )
+@app.route("/sessions/end", methods=["GET", "POST"])
+def end_session():
+    print("🔥 END SESSION ROUTE HIT")
+    try:
+        if not demo_state["session_established"]:
+            flash("No active exam session.", "error")
+            return redirect(url_for("sessions"))
+
+        if not demo_state["exam_active"]:
+            flash("Exam session is not active.", "error")
+            return redirect(url_for("sessions"))
+
+        # Stop the exam
+        demo_state["exam_active"] = False
+        demo_state["exam_ended"] = True
+        print("🔥 exam_active =", demo_state["exam_active"])
+        print("🔥 exam_ended =", demo_state["exam_ended"])
+        demo_state["exam_end_time"] = datetime.now(timezone.utc).isoformat()
+
+        # Create final integrity records
+        tree = MerkleTree()
+        audit_log = AuditLog()
+        answer_leaves = []
+
+        # Demo answer records
+        answers = [
+            {
+                "student_id": "STU001",
+                "question_id": "Q1",
+                "answer": "Answer submitted securely"
+            },
+            {
+                "student_id": "STU002",
+                "question_id": "Q1",
+                "answer": "Another secure answer"
+            }
+        ]
+
+        for answer in answers:
+            leaf_data = json.dumps(
+                answer,
+                sort_keys=True,
+                separators=(",", ":")
+            ).encode("utf-8")
+
+            tree.add_leaf(leaf_data)
+            answer_leaves.append(leaf_data)
+
+            audit_log.add_entry(
+                "ANSWER_SUBMITTED",
+                {
+                    "student_id": answer["student_id"],
+                    "question_id": answer["question_id"],
+                    "leaf_hash": __import__("hashlib")
+                    .sha256(leaf_data)
+                    .hexdigest(),
+                }
+            )
+
+        # Record exam end
+        audit_log.add_entry(
+            "EXAM_ENDED",
+            {
+                "center_id": demo_state["center_id"],
+                "answers_collected": len(answer_leaves),
+            },
+        )
+
+        # Generate final Merkle root
+        root = tree.build_tree()
+
+        demo_state["merkle_root"] = root.hex()
+        demo_state["audit_log"] = audit_log.get_chain()
+        demo_state["audit_log_object"] = audit_log
+        demo_state["answer_leaves"] = answer_leaves
+        demo_state["answers_collected"] = len(answer_leaves)
+        demo_state["integrity_verified"] = audit_log.verify_chain()
+        demo_state["verification_result"] = None
+
+        flash(
+            "Exam session ended and final integrity data was generated successfully.",
+            "success"
+        )
+
+    except Exception as e:
+        flash(f"Failed to end exam session: {str(e)}", "error")
+
+    return redirect(url_for("sessions"))
 @app.route("/sessions/start", methods=["POST"])
 def start_session():
     try:
@@ -525,6 +619,10 @@ def start_session():
         demo_state["center_id"] = center_id
 
         session = start_new_session(center_id)
+        
+        demo_state["exam_active"] = True
+        demo_state["exam_ended"] = False
+        demo_state["exam_end_time"] = None
 
         # Generate peer DH key pair to simulate the board side.
         peer_private, peer_public = generate_dh_keypair(
@@ -574,8 +672,12 @@ def integrity():
 @app.route("/integrity/generate", methods=["POST"])
 def generate_integrity():
     try:
-        if not demo_state["session_established"]:
-            flash("Start an exam session first.", "error")
+        if not demo_state["exam_ended"]:
+            flash("Please end the exam session first.", "error")
+            return redirect(url_for("integrity"))
+
+        if demo_state["audit_log_object"] and demo_state["merkle_root"]:
+            flash("Final integrity data has already been generated.", "success")
             return redirect(url_for("integrity"))
 
         tree = MerkleTree()
@@ -653,19 +755,22 @@ def verification():
 def run_verification():
     try:
         # Make sure the required previous modules have run.
-        if not demo_state["package_ready"]:
-            flash("Please prepare an exam paper first.", "error")
+        if not demo_state["exam_ended"]:
+            flash("Please end the exam session first.", "error")
             return redirect(url_for("verification"))
 
-        if not demo_state["session_established"]:
-            flash("Please start the exam session first.", "error")
+        if not demo_state["answer_leaves"] or not demo_state["merkle_root"]:
+            flash("Exam integrity data is not finalized. Please end the exam session first.", "error")
             return redirect(url_for("verification"))
 
-        if not demo_state["audit_log_object"]:
-            flash("Please generate the integrity proof first.", "error")
-            return redirect(url_for("verification"))
+        package = dict(demo_state["package"]) if demo_state["package"] else {}
 
-        package = dict(demo_state["package"])
+        if not package:
+            flash(
+                "Exam paper package is not available. Verification can only check the finalized answer integrity.",
+                "error",
+            )
+            return redirect(url_for("verification"))
 
         # Give Module 6 the same answer leaves and Merkle root
         # generated by Module 5.
