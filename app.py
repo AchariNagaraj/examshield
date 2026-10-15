@@ -60,6 +60,14 @@ demo_state = {
     "paper_name": None,
     "package_ready": False,
     "session_key": None,
+    "package_version": 0,
+    "revoked_packages": [],
+    "incident_resolved": False,
+    "incident_resolution": "",
+    "incident_resolution_time": "",
+    "replacement_requested": False,
+    "replacement_pending_authorization": False,
+    "exam_on_hold": False,
 
     # Module 2 state
     "key_release_engine": None,
@@ -69,6 +77,10 @@ demo_state = {
     "threshold": 0.70,
     "key_release_approved": False,
     "key_release_message": "Waiting for authorization",
+
+    "emergency_lock": False,
+    "emergency_lock_reason": None,
+    "emergency_lock_time": None,
 
     "center_authenticated": False,
     "center_id": "center_001",
@@ -157,7 +169,17 @@ def prepare_paper():
 
     paper = request.files.get("paper")
     center_ids_text = request.form.get("center_ids", "").strip()
-
+    # A replacement after an incident must be explicitly selected.
+    if demo_state["emergency_lock"]:
+        if not (
+            demo_state.get("incident_resolved", False)
+            and demo_state.get("replacement_requested", False)
+        ):
+            flash(
+                "Resolve the incident and select Replace Paper first.",
+                "error",
+            )
+            return redirect(url_for("papers"))
     # Validate uploaded paper
     if not paper or not paper.filename:
         flash("Please select an exam paper.", "error")
@@ -196,11 +218,39 @@ def prepare_paper():
         output_dir = os.path.join("data", "exam_packages")
         save_package(package, output_dir)
 
-        # Store package for the later modules
+        # Record replacement and invalidate the previous in-memory package.
+        old_version = demo_state.get("package_version", 0)
+
+        if demo_state.get("package") is not None:
+            demo_state.setdefault("revoked_packages", []).append(old_version)
+
+        demo_state["package_version"] = old_version + 1
+        package["package_version"] = demo_state["package_version"]
+
         demo_state["package"] = package
         demo_state["center_ids"] = center_ids
         demo_state["paper_name"] = paper.filename
         demo_state["package_ready"] = True
+        if demo_state.get("replacement_requested", False):
+            demo_state["replacement_pending_authorization"] = True
+            demo_state["replacement_requested"] = False
+            demo_state["exam_on_hold"] = False
+
+        # Reset state belonging to the previous exam.
+        demo_state["key_release_approved"] = False
+        demo_state["session"] = None
+        demo_state["session_key"] = None
+        demo_state["session_established"] = False
+        demo_state["exam_active"] = False
+        demo_state["exam_ended"] = False
+        demo_state["exam_end_time"] = None
+        demo_state["merkle_root"] = None
+        demo_state["answer_leaves"] = []
+        demo_state["answers_collected"] = 0
+        demo_state["verification_result"] = None
+        demo_state["integrity_details"] = None
+        demo_state["report_text"] = None
+        demo_state["report_path"] = None
 
         flash(
             f"Exam paper secured successfully for {len(center_ids)} center(s).",
@@ -359,12 +409,32 @@ def key_release():
         anomaly_score=demo_state["anomaly_score"],
         threshold=demo_state["threshold"],
         approved=demo_state["key_release_approved"],
+        emergency_lock=demo_state["emergency_lock"],
+        emergency_lock_reason=demo_state["emergency_lock_reason"],
+        emergency_lock_time=demo_state["emergency_lock_time"],
+        incident_resolved=demo_state.get("incident_resolved", False),
+        incident_resolution=demo_state.get("incident_resolution", ""),
+        incident_resolution_time=demo_state.get("incident_resolution_time", ""),
+        replacement_pending_authorization=demo_state.get(
+            "replacement_pending_authorization", False
+        ),
+        replacement_requested=demo_state.get("replacement_requested", False),
+        exam_on_hold=demo_state.get("exam_on_hold", False),
     )
 @app.route("/key-release/authorize", methods=["POST"])
 def authorize_key_release():
     """Run the real Module 2 controlled key-release checks."""
 
     center_id = request.form.get("center_id", "").strip()
+
+    if demo_state["emergency_lock"]:
+        demo_state["key_release_approved"] = False
+        demo_state["key_release_message"] = "Emergency Lock is active."
+        flash(
+            "Key release blocked! Emergency Lock is active.",
+            "error"
+        )
+        return redirect(url_for("key_release"))
 
     if not center_id:
         flash("Please select an examination center.", "error")
@@ -482,7 +552,8 @@ def authorize_key_release():
 
         if approved:
             flash(
-                f"Key release approved: {message}",
+                message if "key release approved" in message.lower()
+                else f"Key release approved: {message}",
                 "success",
             )
         else:
@@ -504,6 +575,205 @@ def authorize_key_release():
 
     return redirect(url_for("key_release"))
 
+@app.route("/key-release/emergency-lock", methods=["POST"])
+def activate_emergency_lock():
+    reason = request.form.get("reason", "").strip()
+
+    if not reason:
+        reason = "Suspected examination-paper security incident"
+
+    if demo_state["emergency_lock"]:
+        flash("Emergency Lock is already active.", "error")
+        return redirect(url_for("key_release"))
+
+    # Activate Emergency Lock
+    demo_state["emergency_lock"] = True
+    demo_state["emergency_lock_reason"] = reason
+    demo_state["emergency_lock_time"] = datetime.now(
+        timezone.utc
+    ).isoformat()
+
+    # Suspend an active exam without marking it as completed
+    demo_state["exam_active"] = False
+
+    # Block further key-release approvals
+    demo_state["key_release_approved"] = False
+    demo_state["key_release_message"] = "Emergency Lock is active."
+
+    # Record the emergency in the audit chain
+    audit_log = demo_state.get("audit_log_object")
+
+    if audit_log is None:
+        audit_log = AuditLog()
+
+    audit_log.add_entry(
+        "EMERGENCY_LOCK_ACTIVATED",
+        {
+            "center_id": demo_state["center_id"],
+            "reason": reason,
+            "timestamp": demo_state["emergency_lock_time"],
+        },
+    )
+
+    demo_state["audit_log_object"] = audit_log
+    demo_state["audit_log"] = audit_log.get_chain()
+    demo_state["integrity_verified"] = audit_log.verify_chain()
+
+    flash(
+        "Emergency Lock activated. Further key releases are blocked.",
+        "error",
+    )
+
+    return redirect(url_for("key_release"))
+
+
+@app.route("/key-release/resolve-incident", methods=["POST"])
+def resolve_incident():
+    if not demo_state["emergency_lock"]:
+        flash("There is no active incident to resolve.", "error")
+        return redirect(url_for("key_release"))
+    if demo_state.get("incident_resolved", False):
+        flash("This incident has already been resolved.", "error")
+        return redirect(url_for("key_release"))
+    resolution = request.form.get("resolution", "").strip()
+
+    if not resolution:
+        flash("Please provide the incident resolution details.", "error")
+        return redirect(url_for("key_release"))
+
+    # Record resolution in the existing audit chain
+    audit_log = demo_state.get("audit_log_object")
+
+    if audit_log is None:
+        audit_log = AuditLog()
+
+    resolved_at = datetime.now(timezone.utc).isoformat()
+
+    audit_log.add_entry(
+        "INCIDENT_RESOLVED",
+        {
+            "center_id": demo_state["center_id"],
+            "resolution": resolution,
+            "timestamp": resolved_at,
+            "previous_lock_reason": demo_state.get(
+                "emergency_lock_reason", ""
+            ),
+        },
+    )
+
+    # Update the audit state without replacing earlier entries
+    demo_state["audit_log_object"] = audit_log
+    demo_state["audit_log"] = audit_log.get_chain()
+    demo_state["integrity_verified"] = audit_log.verify_chain()
+
+    # Mark the incident resolved, but do not release any key
+    demo_state["incident_resolved"] = True
+    demo_state["incident_resolution"] = resolution
+    demo_state["incident_resolution_time"] = resolved_at
+
+    # Keep Emergency Lock active until a separate authorized action
+    # explicitly lifts it after investigation.
+    flash(
+        "Incident resolution recorded. Emergency Lock remains active.",
+        "success",
+    )
+
+    return redirect(url_for("key_release"))
+
+@app.route("/incident/decision", methods=["POST"])
+def incident_decision():
+    if not demo_state["emergency_lock"]:
+        flash("No active Emergency Lock.", "error")
+        return redirect(url_for("key_release"))
+
+    if not demo_state.get("incident_resolved", False):
+        flash("Resolve the incident before choosing an action.", "error")
+        return redirect(url_for("key_release"))
+
+    decision = request.form.get("decision", "").strip()
+
+    if decision == "hold":
+        demo_state["exam_on_hold"] = True
+        demo_state["replacement_requested"] = False
+        demo_state["replacement_pending_authorization"] = False
+
+        flash(
+            "Exam remains ON HOLD. Emergency Lock is still active.",
+            "success",
+        )
+        return redirect(url_for("key_release"))
+
+    if decision == "replace":
+        demo_state["exam_on_hold"] = False
+        demo_state["replacement_requested"] = True
+        demo_state["replacement_pending_authorization"] = False
+
+        flash(
+            "Replacement selected. Prepare the replacement paper next.",
+            "success",
+        )
+        return redirect(url_for("papers"))
+
+    flash("Please select a valid incident decision.", "error")
+    return redirect(url_for("key_release"))
+
+@app.route("/incident/resume", methods=["POST"])
+def resume_after_incident():
+    if not demo_state["emergency_lock"]:
+        flash("Emergency Lock is not active.", "error")
+        return redirect(url_for("key_release"))
+
+    if not demo_state.get("incident_resolved", False):
+        flash("Resolve the incident first.", "error")
+        return redirect(url_for("key_release"))
+
+    if not demo_state.get("replacement_pending_authorization", False):
+        flash(
+            "Prepare a replacement paper before resuming this exam.",
+            "error",
+        )
+        return redirect(url_for("key_release"))
+
+    if not demo_state.get("package_ready", False):
+        flash("No replacement package is ready.", "error")
+        return redirect(url_for("key_release"))
+
+    # Explicit authorization to resume; a fresh key release is required.
+    demo_state["emergency_lock"] = False
+    demo_state["emergency_lock_reason"] = None
+    demo_state["emergency_lock_time"] = None
+    demo_state["incident_resolved"] = False
+    demo_state["replacement_pending_authorization"] = False
+    demo_state["key_release_approved"] = False
+    demo_state["key_release_message"] = (
+        "Replacement prepared. Fresh key authorization required."
+    )
+
+    audit_log = demo_state.get("audit_log_object")
+    if audit_log is None:
+        audit_log = AuditLog()
+
+    audit_log.add_entry(
+        "REPLACEMENT_AUTHORIZED_FOR_RESUMPTION",
+        {
+            "center_id": demo_state["center_id"],
+            "package_version": demo_state["package_version"],
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        },
+    )
+
+    demo_state["audit_log_object"] = audit_log
+    demo_state["audit_log"] = audit_log.get_chain()
+    demo_state["integrity_verified"] = audit_log.verify_chain()
+
+    flash(
+        "Resumption authorized. Perform a fresh key-release authorization.",
+        "success",
+    )
+    return redirect(url_for("key_release"))
+
+
+
 
 @app.route("/sessions")
 def sessions():
@@ -518,7 +788,8 @@ def sessions():
         answers_collected=demo_state["answers_collected"],
         exam_active=demo_state["exam_active"],
         exam_ended=demo_state["exam_ended"],
-        exam_end_time=demo_state["exam_end_time"],  
+        exam_end_time=demo_state["exam_end_time"],
+        emergency_lock=demo_state["emergency_lock"],
     )
 @app.route("/sessions/end", methods=["GET", "POST"])
 def end_session():
@@ -541,7 +812,12 @@ def end_session():
 
         # Create final integrity records
         tree = MerkleTree()
-        audit_log = AuditLog()
+
+        # Preserve the existing audit history, including emergency events.
+        audit_log = demo_state.get("audit_log_object")
+        if audit_log is None:
+            audit_log = AuditLog()
+
         answer_leaves = []
 
         # Demo answer records
@@ -611,6 +887,12 @@ def end_session():
 @app.route("/sessions/start", methods=["POST"])
 def start_session():
     try:
+        if demo_state["emergency_lock"]:
+            flash(
+                "Cannot start exam: Emergency Lock is active. Exam is on hold.",
+                "error",
+            )
+            return redirect(url_for("sessions"))
         center_id = request.form.get("center_id", "").strip()
 
         if not center_id:
@@ -754,17 +1036,62 @@ def verification():
 @app.route("/verification/run", methods=["POST"])
 def run_verification():
     try:
-        # Make sure the required previous modules have run.
-        if not demo_state["exam_ended"]:
+# Make sure the required previous modules have run.
+# Normal verification requires an ended exam.
+# If Emergency Lock is active, allow verification of the
+# available evidence even if the exam never reached its end state.
+        if (
+            not demo_state["exam_ended"]
+            and not demo_state.get("emergency_lock", False)
+        ):
             flash("Please end the exam session first.", "error")
             return redirect(url_for("verification"))
+        # Emergency Lock may interrupt the exam before integrity data is finalized.
+        if demo_state.get("emergency_lock", False):
+            package = dict(demo_state["package"]) if demo_state["package"] else {}
 
-        if not demo_state["answer_leaves"] or not demo_state["merkle_root"]:
-            flash("Exam integrity data is not finalized. Please end the exam session first.", "error")
+            if not package:
+                package = {}
+
+            package["emergency_lock"] = True
+
+            result = {
+                "overall": False,
+                "exam_on_hold": True,
+                "signature_valid": None,
+                "merkle_valid": None,
+                "audit_valid": (
+                    demo_state["audit_log_object"].verify_chain()
+                    if demo_state.get("audit_log_object")
+                    else None
+                ),
+                "message": (
+                    "Emergency Lock is active. The exam is on hold; "
+                    "final integrity data may be incomplete."
+                ),
+            }
+
+            demo_state["verification_result"] = result
+            demo_state["integrity_details"] = get_integrity_details(result)
+
+            flash(
+                "Verification status: ON HOLD. Final integrity data is incomplete.",
+                "error",
+            )
             return redirect(url_for("verification"))
 
-        package = dict(demo_state["package"]) if demo_state["package"] else {}
+        # Normal verification still requires finalized integrity data.
+        if not demo_state["answer_leaves"] or not demo_state["merkle_root"]:
+            flash(
+                "Exam integrity data is not finalized. Please end the exam session first.",
+                "error",
+            )
+            return redirect(url_for("verification"))
 
+
+        package = dict(demo_state["package"]) if demo_state["package"] else {}
+        print("DEBUG package_ready:", demo_state.get("package_ready"))
+        print("DEBUG package keys:", list(package.keys()))
         if not package:
             flash(
                 "Exam paper package is not available. Verification can only check the finalized answer integrity.",
@@ -776,7 +1103,7 @@ def run_verification():
         # generated by Module 5.
         package["collected_answers"] = demo_state["answer_leaves"]
         package["claimed_merkle_root"] = demo_state["merkle_root"]
-
+        package["emergency_lock"] = demo_state.get("emergency_lock", False)
         result = full_post_exam_verification(
             center_id=demo_state["center_id"],
             package=package,
@@ -891,7 +1218,7 @@ def tamper_answer_demo():
         # IMPORTANT:
         # Use the original Merkle root generated before tampering.
         package["claimed_merkle_root"] = demo_state["merkle_root"]
-
+        package["emergency_lock"] = demo_state.get("emergency_lock", False)
         result = full_post_exam_verification(
             center_id=demo_state["center_id"],
             package=package,

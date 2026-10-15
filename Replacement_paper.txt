@@ -1,0 +1,10 @@
+# EXAMSHIELD DEMO EXAM
+## REPLACEMENT QUESTION PAPER
+
+**Version:** 2 — Replacement
+
+**Question 1:** Explain the role of RSA digital signatures in verifying the authenticity of an examination paper.
+
+**Question 2:** What is Diffie–Hellman key exchange, and why is it used to establish a shared secret?
+
+**Question 3:** Explain how certificate-based authentication helps prevent unauthorized examination centers from accessing a question paper.

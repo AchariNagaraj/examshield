@@ -106,99 +106,106 @@
         {% endwith %}
 
 
-        <section class="panel">
+       <section class="panel">
 
-            <div class="panel-header">
+    <div class="panel-header">
+        <div>
+            <span class="panel-label">EXAM SESSION</span>
+            <h3>Select Examination Center</h3>
 
-                <div>
-                    <span class="panel-label">EXAM SESSION</span>
-                    <h3>Select Examination Center</h3>
+            <select name="center_id" form="session-form" required>
+                {% for center in centers %}
+                    <option value="{{ center }}"
+                            {% if center == center_id %}selected{% endif %}>
+                        {{ center }}
+                    </option>
+                {% endfor %}
+            </select>
+        </div>
 
-<select name="center_id" form="session-form" required>
-    {% for center in centers %}
-        <option value="{{ center }}"
-                {% if center == center_id %}selected{% endif %}>
-            {{ center }}
-        </option>
-    {% endfor %}
-</select>
-                </div>
+        <span class="badge {{ 'green' if exam_active and not emergency_lock else 'red' }}">
+            {% if emergency_lock %}
+                ON HOLD
+            {% elif exam_active %}
+                ACTIVE
+            {% elif exam_ended %}
+                ENDED
+            {% else %}
+                NOT STARTED
+            {% endif %}
+        </span>
+    </div>
 
-                <span class="badge {{ 'green' if exam_active else 'red' }}">
-                    {{ 'ACTIVE' if exam_active else ('ENDED' if exam_ended else 'NOT STARTED') }}
-                </span>
+    {% if emergency_lock %}
+    <div class="status-card" style="margin: 12px 0;">
+        <strong>🔴 EXAM ON HOLD</strong>
+        <p>Emergency Lock is active.</p>
+        <p>Further key-release approvals and new exam sessions are blocked.</p>
+    </div>
+    {% endif %}
 
-            </div>
+    <div class="verification-list">
 
+        <div>
+            <span>Session Key Exchange</span>
+            <b>{{ '✓ ESTABLISHED' if session_established else 'WAITING' }}</b>
+        </div>
 
-            <div class="verification-list">
+        <div>
+            <span>Key Agreement</span>
+            <b>Diffie-Hellman</b>
+        </div>
 
-                <div>
-                    <span>Session Key Exchange</span>
+        <div>
+            <span>Encryption</span>
+            <b>AES-256</b>
+        </div>
 
-                    <b>
-                        {{ '✓ ESTABLISHED' if session_established else 'WAITING' }}
-                    </b>
-                </div>
+        <div>
+            <span>Answers Collected</span>
+            <b>{{ answers_collected }}</b>
+        </div>
 
+        {% if exam_ended and exam_end_time and not emergency_lock %}
+        <div>
+            <span>Exam Ended At</span>
+            <b>{{ exam_end_time }}</b>
+        </div>
+        {% endif %}
 
-                <div>
-                    <span>Key Agreement</span>
-                    <b>Diffie-Hellman</b>
-                </div>
+    </div>
 
+    <br>
 
-                <div>
-                    <span>Encryption</span>
-                    <b>AES-256</b>
-                </div>
+    {% if not emergency_lock and not exam_active and not exam_ended %}
+    <form id="session-form"
+          method="POST"
+          action="{{ url_for('start_session') }}">
 
+        <button class="primary-btn" type="submit">
+            🔐 Start Secure Exam Session
+        </button>
+    </form>
+    {% endif %}
 
-                <div>
-                    <span>Answers Collected</span>
-                    {% if exam_ended and exam_end_time %}
-                    <div>
-                        <span>Exam Ended At</span>
-                        <b>{{ exam_end_time }}</b>
-                    </div>
-                    {% endif %}
-                    <b>{{ answers_collected }}</b>
-                </div>
+    {% if exam_active and not emergency_lock %}
+    <form method="POST"
+          action="{{ url_for('end_session') }}"
+          style="margin-top: 12px;">
 
-            </div>
+        <button class="primary-btn" type="submit">
+            🔒 End Exam Session
+        </button>
+    </form>
+    {% endif %}
 
+    {% if exam_ended and not emergency_lock %}
+    <div class="status-card" style="margin-top: 12px;">
+        🔴 Exam Session Ended
+    </div>
+    {% endif %}
 
-            <br>
-
-
-           <form id="session-form"
-      method="POST"
-      action="{{ url_for('start_session') }}">
-
-                {% if not exam_active and not exam_ended %}
-<form method="POST" action="/sessions/start">
-    <button class="primary-btn" type="submit">
-        🔐 Start Secure Exam Session
-    </button>
-</form>
-{% endif %}
-
-{% if exam_active %}
-<a href="{{ url_for('end_session') }}" class="primary-btn"
-   style="display: inline-block; text-decoration: none;">
-    🔒 End Exam Session
-</a>
-{% endif %}
-
-{% if exam_ended %}
-<div class="status-card">
-    🔴 Exam Session Ended
-</div>
-{% endif %}
-
-            </form>
-
-        </section>
+</section>
 
     </main>
 

@@ -191,10 +191,14 @@ def full_post_exam_verification(
         signature_valid = False
         merkle_valid = False
 
+    # Check whether the exam was placed on hold
+    exam_on_hold = package.get("emergency_lock", False)
+
     overall = (
         signature_valid
         and merkle_valid
         and audit_valid
+        and not exam_on_hold
     )
 
     return {
@@ -202,18 +206,72 @@ def full_post_exam_verification(
         "signature_valid": signature_valid,
         "merkle_valid": merkle_valid,
         "audit_valid": audit_valid,
+        "exam_on_hold": exam_on_hold,
         "overall": overall,
     }
+
 def get_integrity_details(verification_result: dict) -> dict:
     """
-    Convert verification results into human-readable tamper details
-    for the ExamShield web interface.
+    Convert verification results into human-readable integrity details.
+    Emergency Lock should show ON HOLD, not TAMPERING DETECTED.
     """
 
-    signature_valid = verification_result.get("signature_valid", False)
-    merkle_valid = verification_result.get("merkle_valid", False)
-    audit_valid = verification_result.get("audit_valid", False)
+    signature_valid = verification_result.get("signature_valid")
+    merkle_valid = verification_result.get("merkle_valid")
+    audit_valid = verification_result.get("audit_valid")
+    exam_on_hold = verification_result.get("exam_on_hold", False)
 
+    # Emergency Lock: missing checks are not proof of tampering.
+    if exam_on_hold:
+        return {
+            "paper": {
+                "status": (
+                    "VERIFIED" if signature_valid is True
+                    else "NOT CHECKED" if signature_valid is None
+                    else "TAMPERED"
+                ),
+                "message": (
+                    "Paper signature verified."
+                    if signature_valid is True
+                    else "Paper signature was not checked because the exam is on hold."
+                    if signature_valid is None
+                    else "Paper signature mismatch detected."
+                ),
+            },
+            "answers": {
+                "status": (
+                    "VERIFIED" if merkle_valid is True
+                    else "NOT CHECKED" if merkle_valid is None
+                    else "TAMPERED"
+                ),
+                "message": (
+                    "Answer integrity verified."
+                    if merkle_valid is True
+                    else "Final answer integrity data is unavailable or incomplete while the exam is on hold."
+                    if merkle_valid is None
+                    else "Merkle root mismatch detected."
+                ),
+            },
+            "audit": {
+                "status": (
+                    "VERIFIED" if audit_valid is True
+                    else "NOT CHECKED" if audit_valid is None
+                    else "TAMPERED"
+                ),
+                "message": (
+                    "Audit log hash chain is intact."
+                    if audit_valid is True
+                    else "Audit chain could not be checked."
+                    if audit_valid is None
+                    else "Audit log hash-chain mismatch detected."
+                ),
+            },
+            "overall": {
+                "status": "ON HOLD"
+            },
+        }
+
+    # Normal verification: preserve the existing PASS/FAIL behaviour.
     return {
         "paper": {
             "status": "VERIFIED" if signature_valid else "TAMPERED",
@@ -223,7 +281,6 @@ def get_integrity_details(verification_result: dict) -> dict:
                 else "Paper signature mismatch detected. The paper data may have been modified."
             ),
         },
-
         "answers": {
             "status": "VERIFIED" if merkle_valid else "TAMPERED",
             "message": (
@@ -232,7 +289,6 @@ def get_integrity_details(verification_result: dict) -> dict:
                 else "Merkle root mismatch detected. Submitted answer data may have been modified."
             ),
         },
-
         "audit": {
             "status": "VERIFIED" if audit_valid else "TAMPERED",
             "message": (
@@ -241,10 +297,11 @@ def get_integrity_details(verification_result: dict) -> dict:
                 else "Audit log hash-chain mismatch detected. Audit history may have been modified."
             ),
         },
-
         "overall": {
             "status": "INTACT" if (
-                signature_valid and merkle_valid and audit_valid
+                signature_valid is True
+                and merkle_valid is True
+                and audit_valid is True
             ) else "TAMPERING DETECTED"
         },
     }
