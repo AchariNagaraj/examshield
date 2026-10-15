@@ -7,12 +7,10 @@
 </head>
 
 <body>
-
 <div class="app-layout">
 
     <!-- SIDEBAR -->
     <aside class="sidebar">
-
         <div class="brand">
             <div class="brand-icon">🛡</div>
             <div>
@@ -24,38 +22,14 @@
         <div class="sidebar-section">
             <div class="sidebar-label">COMMAND CENTER</div>
 
-            <a class="nav-item" href="/">
-                <span>⌂</span> Dashboard
-            </a>
-
-            <a class="nav-item" href="/papers">
-                <span>▣</span> Exam Papers
-            </a>
-
-            <a class="nav-item" href="/centers">
-                <span>◉</span> Center Authorization
-            </a>
-
-            <a class="nav-item active" href="/key-release">
-                <span>🔑</span> Key Release
-            </a>
-
-            <a class="nav-item" href="/sessions">
-                <span>◫</span> Exam Sessions
-            </a>
-
-            <a class="nav-item" href="/integrity">
-                <span>◇</span> Integrity & Audit
-            </a>
-
-            <a class="nav-item" href="/verification">
-                <span>✓</span> Verification
-            </a>
-
-            <a class="nav-item" href="/reports">
-                <span>▤</span> Reports
-            </a>
-
+            <a class="nav-item" href="/">⌂ Dashboard</a>
+            <a class="nav-item" href="/papers">▣ Exam Papers</a>
+            <a class="nav-item" href="/centers">◉ Center Authorization</a>
+            <a class="nav-item active" href="/key-release">🔑 Key Release</a>
+            <a class="nav-item" href="/sessions">◫ Exam Sessions</a>
+            <a class="nav-item" href="/integrity">◇ Integrity &amp; Audit</a>
+            <a class="nav-item" href="/verification">✓ Verification</a>
+            <a class="nav-item" href="/reports">▤ Reports</a>
         </div>
 
         <div class="sidebar-bottom">
@@ -64,9 +38,7 @@
                 SYSTEM SECURE
             </div>
         </div>
-
     </aside>
-
 
     <!-- MAIN CONTENT -->
     <main class="main-content">
@@ -81,88 +53,155 @@
             </div>
         </header>
 
-
         <!-- FLASH MESSAGES -->
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
                 {% for category, message in messages %}
-                    <div class="flash {{ category }}">
-                        {{ message }}
-                    </div>
+                    <div class="flash {{ category }}">{{ message }}</div>
                 {% endfor %}
             {% endif %}
         {% endwith %}
 
-
         <section class="panel">
-
             <div class="panel-header">
-
                 <div>
                     <span class="panel-label">SECURITY CHECKPOINT</span>
+                    <h3>Select Examination Center</h3>
 
-                   <h3>Select Examination Center</h3>
-
-<select name="center_id" form="key-release-form" required>
-    {% for center in centers %}
-        <option value="{{ center }}"
-                {% if center == center_id %}selected{% endif %}>
-            {{ center }}
-        </option>
-    {% endfor %}
-</select>
+                    <select name="center_id" form="key-release-form" required>
+                        {% for center in centers %}
+                            <option value="{{ center }}"
+                                {% if center == center_id %}selected{% endif %}>
+                                {{ center }}
+                            </option>
+                        {% endfor %}
+                    </select>
                 </div>
 
-                <span class="badge {{ 'green' if approved else 'red' }}">
-                    {{ 'APPROVED' if approved else 'WAITING' }}
+                <span class="badge {{ 'red' if emergency_lock else ('green' if approved else 'red') }}">
+                    {% if emergency_lock %}
+                        KEY RELEASE BLOCKED
+                    {% elif approved %}
+                        APPROVED
+                    {% else %}
+                        REJECTED
+                    {% endif %}
                 </span>
-
             </div>
 
-
             <div class="verification-list">
-
                 <div>
                     <span>Board Timestamp</span>
                     <b>{{ '✓ VALID' if timestamp_valid else '✗ INVALID' }}</b>
                 </div>
-
                 <div>
                     <span>Center Certificate</span>
                     <b>{{ '✓ VALID' if certificate_valid else '✗ INVALID' }}</b>
                 </div>
-
                 <div>
                     <span>Anomaly Score</span>
                     <b>{{ anomaly_score }}</b>
                 </div>
-
                 <div>
                     <span>Allowed Threshold</span>
                     <b>{{ threshold }}</b>
                 </div>
-
             </div>
-
 
             <br>
 
-
             <form id="key-release-form"
-                method="POST"
-                action="{{ url_for('authorize_key_release') }}">
-
-                <button class="primary-btn" type="submit">
+                  method="POST"
+                  action="{{ url_for('authorize_key_release') }}">
+                <button class="primary-btn" type="submit"
+                        {% if emergency_lock %}disabled{% endif %}>
                     🔑 Authorize Key Release
                 </button>
-
             </form>
 
+            <hr style="margin: 24px 0;">
+
+            <h3>🚨 Emergency Lock</h3>
+
+            {% if emergency_lock %}
+                <p><strong>🔴 EMERGENCY LOCK ACTIVE</strong></p>
+                <p>Exam status: ON HOLD</p>
+                <p>Reason: {{ emergency_lock_reason }}</p>
+                <p>Activated at: {{ emergency_lock_time }}</p>
+                <p>Further key-release approvals are blocked.</p>
+
+                <hr style="margin: 20px 0;">
+
+                <h4>Incident Resolution</h4>
+                <p>Record the corrective action taken during the investigation.</p>
+
+                {% if not incident_resolved %}
+                    <form method="POST"
+                          action="{{ url_for('resolve_incident') }}">
+                        <label for="resolution">Resolution details</label>
+                        <textarea id="resolution"
+                                  name="resolution"
+                                  placeholder="Describe the investigation and corrective action taken..."
+                                  required
+                                  rows="4"
+                                  style="width: 100%; margin: 10px 0 16px; padding: 12px; box-sizing: border-box;"></textarea>
+
+                        <button class="primary-btn" type="submit">
+                            Record Incident Resolution
+                        </button>
+                    </form>
+                {% else %}
+                    <p><strong>✓ Incident resolution recorded</strong></p>
+                    <p>Resolution: {{ incident_resolution }}</p>
+                    <p>Resolved at: {{ incident_resolution_time }}</p>
+                    <p>Emergency Lock remains active until separately cleared.</p>
+                    <hr style="margin: 20px 0;">
+                    <h4>Choose Next Action</h4>
+                    <p>The incident is resolved. Select how the examination should proceed.</p>
+                    <form method="POST" action="{{ url_for('incident_decision') }}"
+                        style="display: flex; gap: 12px; flex-wrap: wrap; margin: 16px 0;">
+                        <button class="primary-btn" type="submit" name="decision" value="replace">
+                            📄 Replace Paper
+                        </button>
+
+                        <button class="primary-btn" type="submit" name="decision" value="hold">
+                            ⏸ Keep Exam on Hold
+                        </button>
+                    </form>
+
+                    {% if replacement_pending_authorization %}
+                        <p><strong>✓ Replacement package prepared.</strong></p>
+                        <p>Fresh authorization is required before the exam can resume.</p>
+
+                        <form method="POST" action="{{ url_for('resume_after_incident') }}">
+                            <button class="primary-btn" type="submit">
+                                🔓 Authorize Resumption
+                            </button>
+                        </form>
+                    </form>
+                {% endif %}
+            {% endif %}
+
+            {% else %}
+                <p>Use this control if a security incident is suspected.</p>
+
+                <form method="POST"
+                      action="{{ url_for('activate_emergency_lock') }}">
+                    <label for="emergency_reason">Reason for emergency lock</label>
+                    <input type="text"
+                           id="emergency_reason"
+                           name="reason"
+                           placeholder="e.g. Suspected paper leak"
+                           required>
+
+                    <button class="primary-btn" type="submit">
+                        🚨 Activate Emergency Lock
+                    </button>
+                </form>
+            {% endif %}
+
         </section>
-
     </main>
-
 </div>
-
 </body>
 </html>
